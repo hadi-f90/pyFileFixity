@@ -25,9 +25,7 @@ def _merge_asized(base, other, level=0):
         base.name = ref2key(base)
     # Add refs from other to base. Any new refs are appended.
     base.refs = list(base.refs) # we may need to append items
-    refs = {}
-    for ref in base.refs:
-        refs[ref2key(ref)] = ref
+    refs = {ref2key(ref): ref for ref in base.refs}
     for ref in other.refs:
         key = ref2key(ref)
         if key in refs:
@@ -83,10 +81,7 @@ class Stats(object):
         :param filename: filename of previously dumped statistics
         :param stream: where to print statistics, defaults to ``sys.stdout``
         """
-        if stream:
-            self.stream = stream
-        else:
-            self.stream = sys.stdout
+        self.stream = stream or sys.stdout
         self.tracker = tracker
         if tracker:
             self.index = tracker.index
@@ -137,19 +132,20 @@ class Stats(object):
         Extend the tracking information by implicit information to make
         sorting easier (DSU pattern).
         """
-        if not self.sorted:
-            # Identify the snapshot that tracked the largest amount of memory.
-            tmax = None
-            maxsize = 0
-            for snapshot in self.snapshots:
-                if snapshot.tracked_total > maxsize:
-                    tmax = snapshot.timestamp
-            for key in list(self.index.keys()):
-                for tobj in self.index[key]:
-                    tobj.classname = key
-                    tobj.size = tobj.get_max_size()
-                    tobj.tsize = tobj.get_size_at_time(tmax)
-                self.sorted.extend(self.index[key])
+        if self.sorted:
+            return
+        # Identify the snapshot that tracked the largest amount of memory.
+        tmax = None
+        maxsize = 0
+        for snapshot in self.snapshots:
+            if snapshot.tracked_total > maxsize:
+                tmax = snapshot.timestamp
+        for key in list(self.index.keys()):
+            for tobj in self.index[key]:
+                tobj.classname = key
+                tobj.size = tobj.get_max_size()
+                tobj.tsize = tobj.get_size_at_time(tmax)
+            self.sorted.extend(self.index[key])
 
 
     def sort_stats(self, *args):
@@ -462,57 +458,58 @@ class HtmlStats(Stats):
         Print detailed statistics and instances for the class `classname`. All
         data will be written to the file `fname`.
         """
-        fobj = open(fname, "w")
-        fobj.write(self.header % (classname, self.style))
+        with open(fname, "w") as fobj:
+            fobj.write(self.header % (classname, self.style))
 
-        fobj.write("<h1>%s</h1>\n" % (classname))
+            fobj.write("<h1>%s</h1>\n" % (classname))
 
-        sizes = [tobj.get_max_size() for tobj in self.index[classname]]
-        total = 0
-        for s in sizes:
-            total += s
-        data = {'cnt': len(self.index[classname]), 'cls': classname}
-        data['avg'] = pp(total / len(sizes))
-        data['max'] = pp(max(sizes))
-        data['min'] = pp(min(sizes))
-        fobj.write(self.class_summary % data)
+            sizes = [tobj.get_max_size() for tobj in self.index[classname]]
+            total = sum(sizes)
+            data = {
+                'cnt': len(self.index[classname]),
+                'cls': classname,
+                'avg': pp(total / len(sizes)),
+            }
 
-        fobj.write(self.charts[classname])
+            data['max'] = pp(max(sizes))
+            data['min'] = pp(min(sizes))
+            fobj.write(self.class_summary % data)
 
-        fobj.write("<h2>Coalesced Referents per Snapshot</h2>\n")
-        for snapshot in self.snapshots:
-            if classname in snapshot.classes:
-                merged = snapshot.classes[classname]['merged']
-                fobj.write(self.class_snapshot % {
-                    'name': snapshot.desc, 'cls':classname, 'total': pp(merged.size)
-                })
-                if merged.refs:
-                    self._print_refs(fobj, merged.refs, merged.size)
-                else:
-                    fobj.write('<p>No per-referent sizes recorded.</p>\n')
+            fobj.write(self.charts[classname])
 
-        fobj.write("<h2>Instances</h2>\n")
-        for tobj in self.index[classname]:
-            fobj.write('<table id="tl" width="100%" rules="rows">\n')
-            fobj.write('<tr><td id="hl" width="140px">Instance</td><td id="hl">%s at 0x%08x</td></tr>\n' % (tobj.name, tobj.id))
-            if tobj.repr:
-                fobj.write("<tr><td>Representation</td><td>%s&nbsp;</td></tr>\n" % tobj.repr)
-            fobj.write("<tr><td>Lifetime</td><td>%s - %s</td></tr>\n" % (pp_timestamp(tobj.birth), pp_timestamp(tobj.death)))
-            if tobj.trace:
-                trace = "<pre>%s</pre>" % (_format_trace(tobj.trace))
-                fobj.write("<tr><td>Instantiation</td><td>%s</td></tr>\n" % trace)
-            for (timestamp, size) in tobj.snapshots:
-                fobj.write("<tr><td>%s</td>" % pp_timestamp(timestamp))
-                if not size.refs:
-                    fobj.write("<td>%s</td></tr>\n" % pp(size.size))
-                else:
-                    fobj.write("<td>%s" % pp(size.size))
-                    self._print_refs(fobj, size.refs, size.size)
-                    fobj.write("</td></tr>\n")
-            fobj.write("</table>\n")
+            fobj.write("<h2>Coalesced Referents per Snapshot</h2>\n")
+            for snapshot in self.snapshots:
+                if classname in snapshot.classes:
+                    merged = snapshot.classes[classname]['merged']
+                    fobj.write(self.class_snapshot % {
+                        'name': snapshot.desc, 'cls':classname, 'total': pp(merged.size)
+                    })
+                    if merged.refs:
+                        self._print_refs(fobj, merged.refs, merged.size)
+                    else:
+                        fobj.write('<p>No per-referent sizes recorded.</p>\n')
 
-        fobj.write(self.footer)
-        fobj.close()
+            fobj.write("<h2>Instances</h2>\n")
+            for tobj in self.index[classname]:
+                fobj.write('<table id="tl" width="100%" rules="rows">\n')
+                fobj.write('<tr><td id="hl" width="140px">Instance</td><td id="hl">%s at 0x%08x</td></tr>\n' % (tobj.name, tobj.id))
+                if tobj.repr:
+                    fobj.write("<tr><td>Representation</td><td>%s&nbsp;</td></tr>\n" % tobj.repr)
+                fobj.write("<tr><td>Lifetime</td><td>%s - %s</td></tr>\n" % (pp_timestamp(tobj.birth), pp_timestamp(tobj.death)))
+                if tobj.trace:
+                    trace = "<pre>%s</pre>" % (_format_trace(tobj.trace))
+                    fobj.write("<tr><td>Instantiation</td><td>%s</td></tr>\n" % trace)
+                for (timestamp, size) in tobj.snapshots:
+                    fobj.write("<tr><td>%s</td>" % pp_timestamp(timestamp))
+                    if not size.refs:
+                        fobj.write("<td>%s</td></tr>\n" % pp(size.size))
+                    else:
+                        fobj.write("<td>%s" % pp(size.size))
+                        self._print_refs(fobj, size.refs, size.size)
+                        fobj.write("</td></tr>\n")
+                fobj.write("</table>\n")
+
+            fobj.write(self.footer)
 
     snapshot_cls_header = """<tr>
         <th id="hl">Class</th>
@@ -553,52 +550,50 @@ class HtmlStats(Stats):
         """
         Output the title page.
         """
-        fobj = open(filename, "w")
-        fobj.write(self.header % (title, self.style))
+        with open(filename, "w") as fobj:
+            fobj.write(self.header % (title, self.style))
 
-        fobj.write("<h1>%s</h1>\n" % title)
-        fobj.write("<h2>Memory distribution over time</h2>\n")
-        fobj.write(self.charts['snapshots'])
+            fobj.write("<h1>%s</h1>\n" % title)
+            fobj.write("<h2>Memory distribution over time</h2>\n")
+            fobj.write(self.charts['snapshots'])
 
-        fobj.write("<h2>Snapshots statistics</h2>\n")
-        fobj.write('<table id="nb">\n')
+            fobj.write("<h2>Snapshots statistics</h2>\n")
+            fobj.write('<table id="nb">\n')
 
-        classlist = list(self.index.keys())
-        classlist.sort()
+            classlist = list(self.index.keys())
+            classlist.sort()
 
-        for snapshot in self.snapshots:
-            fobj.write('<tr><td>\n')
-            fobj.write('<table id="tl" rules="rows">\n')
-            fobj.write("<h3>%s snapshot at %s</h3>\n" % (
-                snapshot.desc or 'Untitled',
-                pp_timestamp(snapshot.timestamp)
-            ))
+            for snapshot in self.snapshots:
+                fobj.write('<tr><td>\n')
+                fobj.write('<table id="tl" rules="rows">\n')
+                fobj.write("<h3>%s snapshot at %s</h3>\n" % (
+                    snapshot.desc or 'Untitled',
+                    pp_timestamp(snapshot.timestamp)
+                ))
 
-            data = {}
-            data['sys']      = pp(snapshot.system_total.vsz)
-            data['tracked']  = pp(snapshot.tracked_total)
-            data['asizeof']  = pp(snapshot.asizeof_total)
-            data['overhead'] = pp(getattr(snapshot, 'overhead', 0))
+                data = {'sys': pp(snapshot.system_total.vsz)}
+                data['tracked']  = pp(snapshot.tracked_total)
+                data['asizeof']  = pp(snapshot.asizeof_total)
+                data['overhead'] = pp(getattr(snapshot, 'overhead', 0))
 
-            fobj.write(self.snapshot_summary % data)
+                fobj.write(self.snapshot_summary % data)
 
-            if snapshot.tracked_total:
-                fobj.write(self.snapshot_cls_header)
-                for classname in classlist:
-                    data = snapshot.classes[classname].copy()
-                    data['cls'] = '<a href="%s">%s</a>' % (self.relative_path(self.links[classname]), classname)
-                    data['sum'] = pp(data['sum'])
-                    data['avg'] = pp(data['avg'])
-                    fobj.write(self.snapshot_cls % data)
-            fobj.write('</table>')
-            fobj.write('</td><td>\n')
-            if snapshot.tracked_total:
-                fobj.write(self.charts[snapshot])
-            fobj.write('</td></tr>\n')
+                if snapshot.tracked_total:
+                    fobj.write(self.snapshot_cls_header)
+                    for classname in classlist:
+                        data = snapshot.classes[classname].copy()
+                        data['cls'] = '<a href="%s">%s</a>' % (self.relative_path(self.links[classname]), classname)
+                        data['sum'] = pp(data['sum'])
+                        data['avg'] = pp(data['avg'])
+                        fobj.write(self.snapshot_cls % data)
+                fobj.write('</table>')
+                fobj.write('</td><td>\n')
+                if snapshot.tracked_total:
+                    fobj.write(self.charts[snapshot])
+                fobj.write('</td></tr>\n')
 
-        fobj.write("</table>\n")
-        fobj.write(self.footer)
-        fobj.close()
+            fobj.write("</table>\n")
+            fobj.write(self.footer)
 
     def create_lifetime_chart(self, classname, filename=''):
         """
@@ -665,9 +660,9 @@ class HtmlStats(Stats):
         xlabel("Execution Time [s]")
         ylabel("Virtual Memory [MiB]")
 
-        sizes = [float(fp.asizeof_total)/(1024*1024) for fp in self.snapshots]
+        sizes = [float(fp.asizeof_total) / 1024**2 for fp in self.snapshots]
         plot(times, sizes, 'r--', label='Total')
-        sizes = [float(fp.tracked_total)/(1024*1024) for fp in self.snapshots]
+        sizes = [float(fp.tracked_total) / 1024**2 for fp in self.snapshots]
         plot(times, sizes, 'b--', label='Tracked total')
 
         for (args, kwds) in polys:

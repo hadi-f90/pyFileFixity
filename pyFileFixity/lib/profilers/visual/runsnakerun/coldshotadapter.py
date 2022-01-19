@@ -46,10 +46,7 @@ class ColdshotAdapter(BaseColdshotAdapter):
     """Adapts a coldshot.loader.Loader into a Squaremap-compatible structure"""
 
     def value(self, node, parent=None):
-        if parent:
-            return parent.child_cumulative_time(node)
-        else:
-            return node.cumulative
+        return parent.child_cumulative_time(node) if parent else node.cumulative
     
     def empty(self, node):
         """Calculate percentage of "empty" time"""

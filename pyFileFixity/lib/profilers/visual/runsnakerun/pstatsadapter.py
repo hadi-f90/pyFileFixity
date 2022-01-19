@@ -12,10 +12,7 @@ class PStatsAdapter(squaremap.DefaultAdapter):
 
     def value(self, node, parent=None):
         if isinstance(parent, pstatsloader.PStatGroup):
-            if parent.cumulative:
-                return node.cumulative / parent.cumulative
-            else:
-                return 0
+            return node.cumulative / parent.cumulative if parent.cumulative else 0
         elif parent is None:
             return node.cumulative
         return parent.child_cumulative_time(node)
@@ -30,9 +27,7 @@ class PStatsAdapter(squaremap.DefaultAdapter):
         return '%s@%s:%s [%s]' % (node.name, node.filename, node.lineno, time)
 
     def empty(self, node):
-        if node.cumulative:
-            return node.local / float(node.cumulative)
-        return 0.0
+        return node.local / float(node.cumulative) if node.cumulative else 0.0
 
     def parents(self, node):
         """Determine all parents of node in our tree"""
@@ -77,6 +72,4 @@ class DirectoryViewAdapter(PStatsAdapter):
     """Provides a directory-view-only adapter for PStats objects"""
     TREE = pstatsloader.TREE_FILES
     def children(self, node):
-        if isinstance(node, pstatsloader.PStatGroup):
-            return node.children
-        return []
+        return node.children if isinstance(node, pstatsloader.PStatGroup) else []

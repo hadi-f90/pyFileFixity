@@ -51,44 +51,33 @@ def _get_memory(pid, timestamps=False, include_children=False):
                 for p in process.get_children(recursive=True):
                     mem_info = getattr(p, 'memory_info', p.get_memory_info)
                     mem += mem_info()[0] / _TWO_20
-            if timestamps:
-                return (mem, time.time())
-            else:
-                return mem
+            return (mem, time.time()) if timestamps else mem
         except psutil.AccessDenied:
             pass
             # continue and try to get this from ps
 
-    # .. scary stuff ..
-    if os.name == 'posix':
-        if include_children:
-            raise NotImplementedError('The psutil module is required when to'
-                                      ' monitor memory usage of children'
-                                      ' processes')
-        warnings.warn("psutil module not found. memory_profiler will be slow")
-        # ..
-        # .. memory usage in MiB ..
-        # .. this should work on both Mac and Linux ..
-        # .. subprocess.check_output appeared in 2.7, using Popen ..
-        # .. for backwards compatibility ..
-        out = subprocess.Popen(['ps', 'v', '-p', str(pid)],
-                               stdout=subprocess.PIPE
-                               ).communicate()[0].split(b'\n')
-        try:
-            vsz_index = out[0].split().index(b'RSS')
-            mem = float(out[1].split()[vsz_index]) / 1024
-            if timestamps:
-                return(mem, time.time())
-            else:
-                return mem
-        except:
-            if timestamps:
-                return (-1, time.time())
-            else:
-                    return -1
-    else:
+    if os.name != 'posix':
         raise NotImplementedError('The psutil module is required for non-unix '
                                   'platforms')
+    if include_children:
+        raise NotImplementedError('The psutil module is required when to'
+                                  ' monitor memory usage of children'
+                                  ' processes')
+    warnings.warn("psutil module not found. memory_profiler will be slow")
+    # ..
+    # .. memory usage in MiB ..
+    # .. this should work on both Mac and Linux ..
+    # .. subprocess.check_output appeared in 2.7, using Popen ..
+    # .. for backwards compatibility ..
+    out = subprocess.Popen(['ps', 'v', '-p', str(pid)],
+                           stdout=subprocess.PIPE
+                           ).communicate()[0].split(b'\n')
+    try:
+        vsz_index = out[0].split().index(b'RSS')
+        mem = float(out[1].split()[vsz_index]) / 1024
+        return (mem, time.time()) if timestamps else mem
+    except:
+        return (-1, time.time()) if timestamps else -1
 
 
 class MemTimer(Process):
@@ -192,11 +181,7 @@ def memory_usage(proc=-1, interval=.1, timeout=None, timestamps=False,
     if stream is not None:
         timestamps = True
 
-    if not max_usage:
-        ret = []
-    else:
-        ret = -1
-
+    ret = [] if not max_usage else -1
     if timeout is not None:
         max_iter = int(timeout / interval)
     elif isinstance(proc, int):
@@ -358,7 +343,7 @@ class TimeStamper:
         return _TimeStamperCM(timestamps)
 
     def add_function(self, func):
-        if not func in self.functions:
+        if func not in self.functions:
             self.functions[func] = []
 
     def wrap_function(self, func):
@@ -545,8 +530,10 @@ def show_results(prof, stream=None, precision=1):
         stream.write('Filename: ' + filename + '\n\n')
         if not os.path.exists(filename):
             stream.write('ERROR: Could not find file ' + filename + '\n')
-            if any([filename.startswith(k) for k in
-                    ("ipython-input", "<ipython-input")]):
+            if any(
+                filename.startswith(k)
+                for k in ("ipython-input", "<ipython-input")
+            ):
                 print("NOTE: %mprun can only be used on functions defined in "
                       "physical files, and not in the IPython environment.")
             continue
@@ -663,14 +650,13 @@ def magic_mprun(self, parameter_s=''):
     builtins.__dict__['profile'] = profile
 
     try:
-        try:
-            profile.runctx(arg_str, global_ns, local_ns)
-            message = ''
-        except SystemExit:
-            message = "*** SystemExit exception caught in code being profiled."
-        except KeyboardInterrupt:
-            message = ("*** KeyboardInterrupt exception caught in code being "
-                       "profiled.")
+        profile.runctx(arg_str, global_ns, local_ns)
+        message = ''
+    except SystemExit:
+        message = "*** SystemExit exception caught in code being profiled."
+    except KeyboardInterrupt:
+        message = ("*** KeyboardInterrupt exception caught in code being "
+                   "profiled.")
     finally:
         if had_profile:
             builtins.__dict__['profile'] = old_profile
@@ -694,11 +680,7 @@ def magic_mprun(self, parameter_s=''):
         print('\n*** Profile printout saved to text file %s. %s' % (text_file,
                                                                     message))
 
-    return_value = None
-    if 'r' in opts:
-        return_value = profile
-
-    return return_value
+    return profile if 'r' in opts else None
 
 
 def _func_exec(stmt, ns):
@@ -757,11 +739,9 @@ def magic_memit(self, line=''):
     import gc
     gc.collect()
 
-    mem_usage = 0
-    counter = 0
     baseline = memory_usage()[0]
-    while counter < repeat:
-        counter += 1
+    mem_usage = 0
+    for _ in range(repeat):
         tmp = memory_usage((_func_exec, (stmt, self.shell.user_ns)),
                            timeout=timeout, interval=interval, max_usage=True,
                            include_children=include_children)

@@ -505,10 +505,7 @@ class MainFrame(wx.Frame):
         self.squareMap.Refresh()
 
     def OnDeeperView(self, event):
-        if not self.squareMap.max_depth:
-            new_depth = 1
-        else:
-            new_depth = self.squareMap.max_depth + 1
+        new_depth = 1 if not self.squareMap.max_depth else self.squareMap.max_depth + 1
         self.squareMap.max_depth = max((self.squareMap.max_depth_seen or 0,
                                         new_depth))
         self.squareMap.Refresh()
@@ -583,10 +580,12 @@ class MainFrame(wx.Frame):
         self.activated_node = self.selected_node = event.node
         self.squareMap.SetModel(event.node, self.adapter)
         self.squareMap.SetSelected( event.node )
-        if editor:
-            if self.SourceShowFile(event.node):
-                if hasattr(event.node,'lineno'):
-                    self.sourceCodeControl.GotoLine(event.node.lineno)
+        if (
+            editor
+            and self.SourceShowFile(event.node)
+            and hasattr(event.node, 'lineno')
+        ):
+            self.sourceCodeControl.GotoLine(event.node.lineno)
         self.RecordHistory()
 
     def SourceShowFile(self, node):

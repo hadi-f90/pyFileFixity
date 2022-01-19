@@ -97,9 +97,8 @@ class BaseFileChooser(BaseChooser):
   def get_path(self, dlg):
     if isinstance(dlg, wx.DirDialog):
       return maybe_quote(dlg.GetPath())
-    else:
-      paths = dlg.GetPaths()
-      return maybe_quote(paths[0]) if len(paths) < 2 else ' '.join(map(maybe_quote, paths))
+    paths = dlg.GetPaths()
+    return maybe_quote(paths[0]) if len(paths) < 2 else ' '.join(map(maybe_quote, paths))
 
 class MyMultiDirChooser(MDD.MultiDirDialog):
   def __init(self, *args, **kwargs):

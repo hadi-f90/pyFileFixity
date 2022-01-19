@@ -39,7 +39,7 @@ def parse_makefile_aliases(filepath):
     # Adding a fake section to make the Makefile a valid Ini file
     ini_str = '[root]\n'
     with open(filepath, 'r') as fd:
-        ini_str = ini_str + fd.read().replace('@make ', '')
+        ini_str += fd.read().replace('@make ', '')
     ini_fp = StringIO.StringIO(ini_str)
     # Parse using ConfigParser
     config = ConfigParser.RawConfigParser()
@@ -48,10 +48,10 @@ def parse_makefile_aliases(filepath):
     aliases = config.options('root')
 
     # -- Extracting commands for each alias
-    commands = {}
-    for alias in aliases:
-        # strip the first line return, and then split by any line return
-        commands[alias] = config.get('root', alias).lstrip('\n').split('\n')
+    commands = {
+        alias: config.get('root', alias).lstrip('\n').split('\n')
+        for alias in aliases
+    }
 
     # -- Commands substitution
     # Loop until all aliases are substituted by their commands:
@@ -74,20 +74,16 @@ def parse_makefile_aliases(filepath):
         for cmd in commands[alias]:
             # Ignore self-referencing (alias points to itself)
             if cmd == alias:
-                pass
-            # Substitute full command
-            elif cmd in aliases and cmd in commands_new:
+                continue
+            if cmd in aliases and cmd in commands_new:
                 # Append all the commands referenced by the alias
                 commands_new[alias].extend(commands_new[cmd])
-            # Delay substituting another alias, waiting for the other alias to
-            # be substituted first
-            elif cmd in aliases and cmd not in commands_new:
+            elif cmd in aliases:
                 # Delete the current entry to avoid other aliases
                 # to reference this one wrongly (as it is empty)
                 del commands_new[alias]
                 aliases_todo.append(alias)
                 break
-            # Full command (no aliases)
             else:
                 commands_new[alias].append(cmd)
     commands = commands_new

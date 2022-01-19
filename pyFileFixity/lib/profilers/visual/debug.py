@@ -29,8 +29,7 @@ from memory_profiler import profile as memoryprofile_linebyline
 
 def startmemorytracker():
     from pympler import tracker
-    tr = tracker.SummaryTracker()
-    return tr
+    return tracker.SummaryTracker()
 
 def runprofilerandshow(funcname, profilepath, argv='', *args, **kwargs):
     '''
@@ -155,8 +154,8 @@ if __name__ == '__main__':
         b = [2] * (2 * 10 ** 7)
         del b
 
-        for i in range(2):
-            a = [1] * (10 ** 6)
+        a = [1] * (10 ** 6)
+        for _ in range(2):
             b = [2] * (2 * 10 ** 7)
             del b
         return a

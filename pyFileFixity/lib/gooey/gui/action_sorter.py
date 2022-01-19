@@ -136,5 +136,4 @@ class ActionSorter(object):
             or isinstance(action, _StoreConstAction)]
 
 
-if __name__ == '__main__':
-  pass
+pass

@@ -28,10 +28,7 @@ class PStatsLoader( object ):
         """Get the set of rows for the type-key"""
         if key not in self.roots:
             self.get_root( key )
-        if key == 'location':
-            return self.location_rows 
-        else:
-            return self.rows
+        return self.location_rows if key == 'location' else self.rows
     def get_adapter( self, key ):
         import pstatsadapter
         if key == 'functions':
@@ -130,11 +127,10 @@ class PStatsLoader( object ):
                     break
                 key = new_key
                 parent = directories.get( key )
-                if parent:
-                    if value is not parent:
-                        parent.children.append( value )
-                        found = True
-                        break
+                if parent and value is not parent:
+                    parent.children.append( value )
+                    found = True
+                    break
             if not found:
                 root.children.append( value )
         # lastly, finalize all of the directory records...
@@ -149,8 +145,9 @@ class BaseStat( object ):
             if not already_done.has_key( child ):
                 already_done[child] = True
                 yield child
-                for descendent in child.recursive_distinct( already_done=already_done, attribute=attribute ):
-                    yield descendent
+                yield from child.recursive_distinct(
+                    already_done=already_done, attribute=attribute
+                )
 
     def descendants( self ):
         return list( self.recursive_distinct( attribute='children' ))
@@ -250,7 +247,7 @@ class PStatGroup( BaseStat ):
             for child in children:
                 if isinstance( child, PStatGroup ) or not self.LOCAL_ONLY:
                     values.append( getattr( child, field, 0 ) )
-                elif isinstance( child, PStatRow ) and self.LOCAL_ONLY:
+                elif isinstance(child, PStatRow):
                     values.append( getattr( child, local_field, 0 ) )
             value = sum( values )
             setattr( self, field, value )
@@ -260,7 +257,7 @@ class PStatGroup( BaseStat ):
             self.recursive = 0
         if local_children:
             for field in ('local','calls'):
-                value = sum([ getattr( child, field, 0 ) for child in children] )
+                value = sum(getattr( child, field, 0 ) for child in children)
                 setattr( self, field, value )
             if self.calls:
                 self.localPer = self.local / self.calls

@@ -122,7 +122,7 @@ class Profiler(object):
                 parent = frame_for_stack(stack[:-1])
                 frame_name = stack[-1]
 
-                if not frame_name in parent.children_dict:
+                if frame_name not in parent.children_dict:
                     parent.add_child(Frame(frame_name, parent))
 
                 return parent.children_dict[frame_name]
@@ -148,10 +148,7 @@ class Profiler(object):
         return frame
 
     def starting_frame(self, root=False):
-        if root:
-            return self.root_frame()
-        else:
-            return self.first_interesting_frame()
+        return self.root_frame() if root else self.first_interesting_frame()
 
     def output_text(self, root=False, unicode=False, color=False):
         return self.starting_frame(root=root).as_text(unicode=unicode, color=color)
@@ -170,7 +167,7 @@ class Profiler(object):
 
         body = self.starting_frame(root).as_html()
 
-        page = '''
+        return '''
             <html>
             <head>
                 <style>{css}</style>
@@ -180,9 +177,9 @@ class Profiler(object):
                 {body}
                 <script>{js}</script>
             </body>
-            </html>'''.format(css=css, js=js, jquery_js=jquery_js, body=body)
-
-        return page
+            </html>'''.format(
+            css=css, js=js, jquery_js=jquery_js, body=body
+        )
 
 
 class Frame(object):
@@ -333,8 +330,8 @@ class Frame(object):
     def as_html(self):
         start_collapsed = all(child.proportion_of_total < 0.1 for child in self.children)
 
-        extra_class = ''
-        extra_class += 'collapse ' if start_collapsed else ''
+        extra_class = '' + ('collapse ' if start_collapsed else '')
+
         extra_class += 'no_children ' if not self.children else ''
         extra_class += 'application ' if self.is_application_code else ''
 

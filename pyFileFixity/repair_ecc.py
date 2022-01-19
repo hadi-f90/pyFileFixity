@@ -73,27 +73,16 @@ except ImportError as exc:
 
 def conditional_decorator(flag, dec):  # pragma: no cover
     def decorate(fn):
-        if flag:
-            return dec(fn)
-        else:
-            return fn
+        return dec(fn) if flag else fn
     return decorate
 
-def check_gui_arg():  # pragma: no cover
+def check_gui_arg():    # pragma: no cover
     '''Check that the --gui argument was passed, and if true, we remove the --gui option and replace by --gui_launched so that Gooey does not loop infinitely'''
-    if len(sys.argv) > 1 and sys.argv[1] == '--gui':
-        # DEPRECATED since Gooey automatically supply a --ignore-gooey argument when calling back the script for processing
-        #sys.argv[1] = '--gui_launched' # CRITICAL: need to remove/replace the --gui argument, else it will stay in memory and when Gooey will call the script again, it will be stuck in an infinite loop calling back and forth between this script and Gooey. Thus, we need to remove this argument, but we also need to be aware that Gooey was called so that we can call gooey.GooeyParser() instead of argparse.ArgumentParser() (for better fields management like checkboxes for boolean arguments). To solve both issues, we replace the argument --gui by another internal argument --gui_launched.
-        return True
-    else:
-        return False
+    return len(sys.argv) > 1 and sys.argv[1] == '--gui'
 
-def AutoGooey(fn):  # pragma: no cover
+def AutoGooey(fn):    # pragma: no cover
     '''Automatically show a Gooey GUI if --gui is passed as the first argument, else it will just run the function as normal'''
-    if check_gui_arg():
-        return gooey.Gooey(fn)
-    else:
-        return fn
+    return gooey.Gooey(fn) if check_gui_arg() else fn
 
 
 

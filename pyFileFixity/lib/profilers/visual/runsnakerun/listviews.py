@@ -3,11 +3,7 @@ from gettext import gettext as _
 from squaremap import squaremap
 from wx.lib.agw.ultimatelistctrl import UltimateListCtrl,ULC_REPORT,ULC_VIRTUAL,ULC_VRULES,ULC_SINGLE_SEL
 
-if sys.platform == 'win32':
-    windows = True
-else:
-    windows = False
-
+windows = sys.platform == 'win32'
 log = logging.getLogger(__name__)
 
 class ColumnDefinition(object):
@@ -226,10 +222,7 @@ class DataView(wx.ListCtrl):
 
     def reorder(self, single_column=False):
         """Force a reorder of the displayed items"""
-        if single_column:
-            columns = self.sortOrder[:1]
-        else:
-            columns = self.sortOrder
+        columns = self.sortOrder[:1] if single_column else self.sortOrder
         for ascending,column in columns[::-1]:
             # Python 2.2+ guarantees stable sort, so sort by each column in reverse 
             # order will order by the assigned columns 

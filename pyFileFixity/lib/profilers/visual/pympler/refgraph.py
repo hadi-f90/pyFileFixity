@@ -96,9 +96,9 @@ class ReferenceGraph(object):
         objects identified as leafs.
         """
         result = []
-        idset = set([id(x) for x in graph])
+        idset = {id(x) for x in graph}
         for n in graph:
-            refset = set([id(x) for x in get_referents(n)])
+            refset = {id(x) for x in get_referents(n)}
             if refset.intersection(idset):
                 result.append(n)
         return result
@@ -150,15 +150,14 @@ class ReferenceGraph(object):
         The function returns a set of tuples (id(a), id(b), ref) if a
         references b with the referent 'ref'.
         """
-        idset = set([id(x) for x in self.objects])
+        idset = {id(x) for x in self.objects}
         self.edges = set([])
         for n in self.objects:
-            refset = set([id(x) for x in get_referents(n)])
+            refset = {id(x) for x in get_referents(n)}
             for ref in refset.intersection(idset):
                 label = ''
-                members = None
-                if isinstance(n, dict):
-                    members = n.items()
+                members = n.items() if isinstance(n, dict) else None
+
                 if not members:
                     members = named_refs(n)
                 for (k, v) in members:
@@ -173,10 +172,7 @@ class ReferenceGraph(object):
         Annotate the objects belonging to separate (non-connected) graphs with
         individual indices.
         """
-        g = {}
-        for x in self.metadata:
-            g[x.id] = x
-
+        g = {x.id: x for x in self.metadata}
         idx = 0
         for x in self.metadata:
             if not hasattr(x, 'group'):
@@ -206,10 +202,10 @@ class ReferenceGraph(object):
         Returns `True` if the group is non-empty. Otherwise returns `False`.
         """
         self.metadata = [x for x in self.metadata if x.group == group]
-        group_set = set([x.id for x in self.metadata])
+        group_set = {x.id for x in self.metadata}
         self.objects = [obj for obj in self.objects if id(obj) in group_set]
         self.count = len(self.metadata)
-        if self.metadata == []:
+        if not self.metadata:
             return False
 
         self.edges = [e for e in self.edges if e.group == group]
@@ -246,7 +242,7 @@ class ReferenceGraph(object):
             subgraph.edges = self.edges.copy()
 
             if subgraph._filter_group(group):
-                subgraph.total_size = sum([x.size for x in subgraph.metadata])
+                subgraph.total_size = sum(x.size for x in subgraph.metadata)
                 subgraph.index = index
                 index += 1
                 yield subgraph
@@ -290,24 +286,23 @@ class ReferenceGraph(object):
         within the metadata list. The text representation can be transformed to
         a graph with graphviz. Returns a string.
         """
-        s = []
-        header = '// Process this file with graphviz\n'
-        s.append( header)
-        s.append('digraph G {\n')
-        s.append('    node [shape=box];\n')
+        s = [
+            '// Process this file with graphviz\n',
+            'digraph G {\n',
+            '    node [shape=box];\n',
+        ]
+
         for md in self.metadata:
             label = trunc(md.str, 48).replace('"', "'")
             extra = ''
-            if md.type == 'instancemethod':
-                extra = ', color=red'
-            elif md.type == 'frame':
+            if md.type == 'frame':
                 extra = ', color=orange'
+            elif md.type == 'instancemethod':
+                extra = ', color=red'
             s.append('    "X%s" [ label = "%s\\n%s" %s ];\n' % \
                 (hex(md.id)[1:], label, md.type, extra))
         for e in self.edges:
-            extra = ''
-            if e.label == '__dict__':
-                extra = ',weight=100'
+            extra = ',weight=100' if e.label == '__dict__' else ''
             s.append('    X%s -> X%s [label="%s"%s];\n' % \
                 (hex(e.src)[1:], hex(e.dst)[1:], e.label, extra))
 
@@ -356,7 +351,6 @@ class ReferenceGraph(object):
         """
         Write raw graph data which can be post-processed using graphviz.
         """
-        f = open(filename, 'w')
-        f.write(self._get_graphviz_data())
-        f.close()
+        with open(filename, 'w') as f:
+            f.write(self._get_graphviz_data())
 

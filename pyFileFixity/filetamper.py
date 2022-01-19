@@ -92,21 +92,20 @@ def tamper_file(filepath, mode='e', proba=0.03, block_proba=None, blocksize=6553
                 burst_remain = 0 # if burst is enabled and corruption probability is triggered, then we will here store the remaining number of characters to corrupt (the length is uniformly sampled over the range specified in arguments)
                 # Create the list of bits to tamper (it's a lot more efficient to precompute the list of characters to corrupt, and then modify in the file the characters all at once)
                 for i in xrange(len(buf)):
-                    if burst_remain > 0 or (random.random() < proba): # Corruption probability: corrupt only if below the bit-flip proba
+                    if burst_remain > 0: # Corruption probability: corrupt only if below the bit-flip proba
                         pos2tamper.append(i) # keep this character's position in the to-be-corrupted list
-                        if burst_remain > 0: # if we're already in a burst, we minus one and continue onto the next character
-                            burst_remain -= 1
-                        elif burst_length: # else we're not in a burst, we create one (triggered by corruption probability: as soon as one character triggers the corruption probability, then we do a burst)
-                            burst_remain = random.randint(burst_length[0], burst_length[1]) - 1 # if burst is enabled, then we randomly (uniformly) pick a random length for the burst between the range specified, and since we already tampered one character, we minus 1
+                        burst_remain -= 1
+                    elif random.random() < proba: # Corruption probability: corrupt only if below the bit-flip proba
+                        pos2tamper.append(i) # keep this character's position in the to-be-corrupted list
                 # If there's any character to tamper in the list, we tamper the string
                 if pos2tamper:
-                    tamper_count = tamper_count + len(pos2tamper)
+                    tamper_count += len(pos2tamper)
                     #print("Before: %s" % buf)
                     buf = bytearray(buf) # Strings in Python are immutable, thus we need to convert to a bytearray
                     for pos in pos2tamper:
-                        if mode == 'e' or mode == 'erasure': # Erase the character (set a null byte)
+                        if mode in ['e', 'erasure']: # Erase the character (set a null byte)
                             buf[pos] = 0
-                        elif mode == 'n' or mode == 'noise': # Noising the character (set a random ASCII character)
+                        elif mode in ['n', 'noise']: # Noising the character (set a random ASCII character)
                             buf[pos] = random.randint(0,255)
                     #print("After: %s" % buf)
                     # Overwriting the string into the file
@@ -128,9 +127,10 @@ def tamper_dir(inputpath, *args, **kwargs):
     silent = kwargs.get('silent', False)
     if 'silent' in kwargs: del kwargs['silent']
 
-    filescount = 0
-    for _ in tqdm(recwalk(inputpath), desc='Precomputing', disable=silent):
-        filescount += 1
+    filescount = sum(
+        1
+        for _ in tqdm(recwalk(inputpath), desc='Precomputing', disable=silent)
+    )
 
     files_tampered = 0
     tamper_count = 0
@@ -163,27 +163,16 @@ except ImportError as exc:
 
 def conditional_decorator(flag, dec):  # pragma: no cover
     def decorate(fn):
-        if flag:
-            return dec(fn)
-        else:
-            return fn
+        return dec(fn) if flag else fn
     return decorate
 
-def check_gui_arg():  # pragma: no cover
+def check_gui_arg():    # pragma: no cover
     '''Check that the --gui argument was passed, and if true, we remove the --gui option and replace by --gui_launched so that Gooey does not loop infinitely'''
-    if len(sys.argv) > 1 and sys.argv[1] == '--gui':
-        # DEPRECATED since Gooey automatically supply a --ignore-gooey argument when calling back the script for processing
-        #sys.argv[1] = '--gui_launched' # CRITICAL: need to remove/replace the --gui argument, else it will stay in memory and when Gooey will call the script again, it will be stuck in an infinite loop calling back and forth between this script and Gooey. Thus, we need to remove this argument, but we also need to be aware that Gooey was called so that we can call gooey.GooeyParser() instead of argparse.ArgumentParser() (for better fields management like checkboxes for boolean arguments). To solve both issues, we replace the argument --gui by another internal argument --gui_launched.
-        return True
-    else:
-        return False
+    return len(sys.argv) > 1 and sys.argv[1] == '--gui'
 
-def AutoGooey(fn):  # pragma: no cover
+def AutoGooey(fn):    # pragma: no cover
     '''Automatically show a Gooey GUI if --gui is passed as the first argument, else it will just run the function as normal'''
-    if check_gui_arg():
-        return gooey.Gooey(fn)
-    else:
-        return fn
+    return gooey.Gooey(fn) if check_gui_arg() else fn
 
 
 #***********************************
@@ -208,7 +197,7 @@ WARNING: this will tamper the file you specify. Please ensure you keep a copy of
 
     #-- Constructing the parser
     # Use GooeyParser if we want the GUI because it will provide better widgets
-    if len(argv) > 0 and (argv[0] == '--gui' and not '--ignore-gooey' in argv):  # pragma: no cover
+    if len(argv) > 0 and argv[0] == '--gui' and '--ignore-gooey' not in argv:  # pragma: no cover
         # Initialize the Gooey parser
         main_parser = gooey.GooeyParser(add_help=True, description=desc, epilog=ep, formatter_class=argparse.RawTextHelpFormatter)
         # Define Gooey widget types explicitly (because type auto-detection doesn't work quite well)
@@ -265,7 +254,6 @@ WARNING: this will tamper the file you specify. Please ensure you keep a copy of
     if args.block_probability:
         block_proba = float(args.block_probability[0])
 
-    blocksize = 65536
     header = args.header
 
     # -- Configure the log file if enabled (ptee.write() will write to both stdout/console and to the log file)
@@ -276,21 +264,19 @@ WARNING: this will tamper the file you specify. Please ensure you keep a copy of
     else:
         ptee = Tee(nostdout=silent)
 
-    # == PROCESSING BRANCHING == #
-    # Sanity check
     if not os.path.exists(filepath):
         raise RuntimeError("Path does not exist: %s" % filepath)
-    else:
-        # -- Tampering a file
-        if os.path.isfile(filepath):
-            ptee.write('Tampering the file %s, please wait...' % os.path.basename(filepath))
-            tcount, tsize = tamper_file(filepath, mode=mode, proba=proba, block_proba=block_proba, blocksize=blocksize, burst_length=burst_length, header=header, silent=silent)
-            ptee.write("Tampering done: %i/%i (%.2f%%) characters tampered." % (tcount, tsize, tcount / max(1, tsize) * 100))
-        # -- Tampering a directory tree recursively
-        elif os.path.isdir(filepath):
-            ptee.write('Tampering all files in directory %s, please wait...' % filepath)
-            files_tampered, filescount, tcount, tsize = tamper_dir(filepath, mode=mode, proba=proba, block_proba=block_proba, blocksize=blocksize, burst_length=burst_length, header=header, silent=silent)
-            ptee.write("Tampering done: %i/%i files tampered and overall %i/%i (%.2f%%) characters were tampered." % (files_tampered, filescount, tcount, tsize, tcount / max(1, tsize) * 100))
+    blocksize = 65536
+    # -- Tampering a file
+    if os.path.isfile(filepath):
+        ptee.write('Tampering the file %s, please wait...' % os.path.basename(filepath))
+        tcount, tsize = tamper_file(filepath, mode=mode, proba=proba, block_proba=block_proba, blocksize=blocksize, burst_length=burst_length, header=header, silent=silent)
+        ptee.write("Tampering done: %i/%i (%.2f%%) characters tampered." % (tcount, tsize, tcount / max(1, tsize) * 100))
+    # -- Tampering a directory tree recursively
+    elif os.path.isdir(filepath):
+        ptee.write('Tampering all files in directory %s, please wait...' % filepath)
+        files_tampered, filescount, tcount, tsize = tamper_dir(filepath, mode=mode, proba=proba, block_proba=block_proba, blocksize=blocksize, burst_length=burst_length, header=header, silent=silent)
+        ptee.write("Tampering done: %i/%i files tampered and overall %i/%i (%.2f%%) characters were tampered." % (files_tampered, filescount, tcount, tsize, tcount / max(1, tsize) * 100))
 
     del ptee
     return 0

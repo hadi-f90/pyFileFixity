@@ -43,4 +43,4 @@ def create_from_parser(parser, source_path, **kwargs):
 
 
 def has_argparse(module_path):
-  return any(['.parse_args(' in line.lower() for line in f.readlines()])
+  return any('.parse_args(' in line.lower() for line in f.readlines())

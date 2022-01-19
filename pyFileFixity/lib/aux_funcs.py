@@ -18,27 +18,24 @@ except ImportError:
 
 def is_file(dirname):
     '''Checks if a path is an actual file that exists'''
-    if not os.path.isfile(dirname):
-        msg = "{0} is not an existing file".format(dirname)
-        raise argparse.ArgumentTypeError(msg)
-    else:
+    if os.path.isfile(dirname):
         return dirname
+    msg = "{0} is not an existing file".format(dirname)
+    raise argparse.ArgumentTypeError(msg)
 
 def is_dir(dirname):
     '''Checks if a path is an actual directory that exists'''
-    if not os.path.isdir(dirname):
-        msg = "{0} is not a directory".format(dirname)
-        raise argparse.ArgumentTypeError(msg)
-    else:
+    if os.path.isdir(dirname):
         return dirname
+    msg = "{0} is not a directory".format(dirname)
+    raise argparse.ArgumentTypeError(msg)
 
 def is_dir_or_file(dirname):
     '''Checks if a path is an actual directory that exists or a file'''
-    if not os.path.isdir(dirname) and not os.path.isfile(dirname):
-        msg = "{0} is not a directory nor a file".format(dirname)
-        raise argparse.ArgumentTypeError(msg)
-    else:
+    if os.path.isdir(dirname) or os.path.isfile(dirname):
         return dirname
+    msg = "{0} is not a directory nor a file".format(dirname)
+    raise argparse.ArgumentTypeError(msg)
 
 def fullpath(relpath):
     '''Relative path to absolute'''
@@ -76,10 +73,7 @@ def path2unix(path, nojoin=False, fromwinpath=False):
         pathparts = list(PureWindowsPath(path).parts)
     else:
         pathparts = list(PurePath(path).parts)
-    if nojoin:
-        return pathparts
-    else:
-        return posixpath.join(*pathparts)
+    return pathparts if nojoin else posixpath.join(*pathparts)
 
 def get_next_entry(file, entrymarker="\xFE\xFF\xFE\xFF\xFE\xFF\xFE\xFF\xFE\xFF", only_coord=True, blocksize=65535):
     '''Find or read the next ecc entry in a given ecc file.
@@ -125,21 +119,20 @@ def get_next_entry(file, entrymarker="\xFE\xFF\xFE\xFF\xFE\xFF\xFE\xFF\xFE\xFF",
         # Stop criterion to avoid infinite loop: in the case we could not find any entry in the rest of the file and we reached the EOF, we just quit now
         if len(buf) < blocksize: break
         # Did not find the full entry in one buffer? Reinit variables for next iteration, but keep in memory startcursor.
-        if start > 0: start = 0 # reset the start position for the end buf find at next iteration (ie: in the arithmetic operations to compute the absolute endcursor position, the start entrymarker won't be accounted because it was discovered in a previous buffer).
+        start = min(start, 0)
         if not endcursor: file.seek(file.tell()-len(entrymarker)) # Try to fix edge case where blocksize stops the buffer exactly in the middle of the ending entrymarker. The starting marker should always be ok because it should be quite close (or generally immediately after) the previous entry, but the end depends on the end of the current entry (size of the original file), thus the buffer may miss the ending entrymarker. should offset file.seek(-len(entrymarker)) before searching for ending.
 
-    if found: # if an entry was found, we seek to the beginning of the entry and then either read the entry from file or just return the markers positions (aka the entry bounds)
-        file.seek(startcursor + len(entrymarker))
-        if only_coord:
-            # Return only coordinates of the start and end markers
-            # Note: it is useful to just return the reading positions and not the entry itself because it can get quite huge and may overflow memory, thus we will read each ecc blocks on request using a generator.
-            return [startcursor + len(entrymarker), endcursor]
-        else:
-            # Return the full entry's content
-            return file.read(endcursor - startcursor - len(entrymarker))
-    else:
+    if not found:
         # Nothing found (or no new entry to find, we've already found them all), so we return None
         return None
+    file.seek(startcursor + len(entrymarker))
+    if only_coord:
+        # Return only coordinates of the start and end markers
+        # Note: it is useful to just return the reading positions and not the entry itself because it can get quite huge and may overflow memory, thus we will read each ecc blocks on request using a generator.
+        return [startcursor + len(entrymarker), endcursor]
+    else:
+        # Return the full entry's content
+        return file.read(endcursor - startcursor - len(entrymarker))
 
 def create_dir_if_not_exist(path):  # pragma: no cover
     """Create a directory if it does not already exist, else nothing is done and no error is return"""
@@ -201,7 +194,7 @@ def grouper(n, iterable, fillvalue=None):
     args = [iter(iterable)] * n
     return izip_longest(fillvalue=fillvalue, *args)
 
-def group_files_by_size(fileslist, multi):  # pragma: no cover
+def group_files_by_size(fileslist, multi):    # pragma: no cover
     ''' Cluster files into the specified number of groups, where each groups total size is as close as possible to each other.
 
     Pseudo-code (O(n^g) time complexity):
@@ -237,15 +230,11 @@ def group_files_by_size(fileslist, multi):  # pragma: no cover
         fgrouped[i] = []
         big_key, big_value = flord.popitem(0)
         fgrouped[i].append([big_key])
-        for j in xrange(multi-1):
-            cluster = []
+        for _ in xrange(multi-1):
             if not flord: break
             child_key, child_value = flord.popitem(0)
-            cluster.append(child_key)
-            if child_value == big_value:
-                fgrouped[i].append(cluster)
-                continue
-            else:
+            cluster = [child_key]
+            if child_value != big_value:
                 diff = big_value - child_value
                 for key, value in flord.iteritems():
                     if value <= diff:
@@ -253,13 +242,12 @@ def group_files_by_size(fileslist, multi):  # pragma: no cover
                         del flord[key]
                         if value == diff:
                             break
-                        else:
-                            child_value += value
-                            diff = big_value - child_value
-                fgrouped[i].append(cluster)
+                        child_value += value
+                        diff = big_value - child_value
+            fgrouped[i].append(cluster)
     return fgrouped
 
-def group_files_by_size_fast(fileslist, nbgroups, mode=1):  # pragma: no cover
+def group_files_by_size_fast(fileslist, nbgroups, mode=1):    # pragma: no cover
     '''Given a files list with sizes, output a list where the files are grouped in nbgroups per cluster.
 
     Pseudo-code for algorithm in O(n log(g)) (thank's to insertion sort or binary search trees)
@@ -296,7 +284,7 @@ def group_files_by_size_fast(fileslist, nbgroups, mode=1):  # pragma: no cover
             if mode==0:
                 for g in xrange(nbgroups-1, 0, -1):
                     fgrouped[last_cid].append([])
-                    if not fsize in ftofill_pointer:
+                    if fsize not in ftofill_pointer:
                         ftofill_pointer[fsize] = []
                     ftofill_pointer[fsize].append((last_cid, g))
                     ftofill.add(fsize)
@@ -310,7 +298,7 @@ def group_files_by_size_fast(fileslist, nbgroups, mode=1):  # pragma: no cover
                     fgrouped[last_cid].append([fgname])
                     diff_size = fsize - fgsize
                     if diff_size > 0:
-                        if not diff_size in ftofill_pointer:
+                        if diff_size not in ftofill_pointer:
                             ftofill_pointer[diff_size] = []
                         ftofill_pointer[diff_size].append((last_cid, g))
                         ftofill.add(diff_size)
@@ -322,18 +310,18 @@ def group_files_by_size_fast(fileslist, nbgroups, mode=1):  # pragma: no cover
             fgrouped[c][g].append(fname)
             nsize = ksize - fsize
             if nsize > 0:
-                if not nsize in ftofill_pointer:
+                if nsize not in ftofill_pointer:
                     ftofill_pointer[nsize] = []
                 ftofill_pointer[nsize].append((c, g))
                 ftofill.add(nsize)
     return fgrouped
 
-def group_files_by_size_simple(fileslist, nbgroups):  # pragma: no cover
+def group_files_by_size_simple(fileslist, nbgroups):    # pragma: no cover
     """ Simple and fast files grouping strategy: just order by size, and group files n-by-n, so that files with the closest sizes are grouped together.
     In this strategy, there is only one file per subgroup, and thus there will often be remaining space left because there is no filling strategy here, but it's very fast. """
     ford = sorted(fileslist.iteritems(), key=lambda x: x[1], reverse=True)
     ford = [[x[0]] for x in ford]
-    return [group for group in grouper(nbgroups, ford)]
+    return list(grouper(nbgroups, ford))
 
 def grouped_count_sizes(fileslist, fgrouped):  # pragma: no cover
     '''Compute the total size per group and total number of files. Useful to check that everything is OK.'''
@@ -356,16 +344,10 @@ def grouped_count_sizes(fileslist, fgrouped):  # pragma: no cover
     return fsizes, total_files
 
 def gen_rand_fileslist(nbfiles=100, maxvalue=100):  # pragma: no cover
-    fileslist = {}
-    for i in xrange(nbfiles):
-        fileslist["file_%i" % i] = randint(1, maxvalue)
-    return fileslist
+    return {"file_%i" % i: randint(1, maxvalue) for i in xrange(nbfiles)}
 
 def gen_rand_fileslist2(nbfiles=100, maxvalue=100):  # pragma: no cover
-    fileslist = []
-    for i in xrange(nbfiles):
-        fileslist.append( ("file_%i" % i, randint(1, maxvalue)) )
-    return fileslist
+    return [("file_%i" % i, randint(1, maxvalue)) for i in xrange(nbfiles)]
 
 def grouped_test(nbfiles=100, nbgroups=3):  # pragma: no cover
     fileslist = gen_rand_fileslist(nbfiles)

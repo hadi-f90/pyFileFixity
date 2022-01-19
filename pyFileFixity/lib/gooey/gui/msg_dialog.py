@@ -14,5 +14,4 @@ def ShowError(msg):
     wx.ICON_ERROR)
 
 
-if __name__ == '__main__':
-  pass
+pass

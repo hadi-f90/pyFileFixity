@@ -74,9 +74,7 @@ def sort_dict_of_paths(d):
     for key in d.keys():
         if d[key]:
             d[key] = ['']*(max_rec-len(d[key])) + d[key]
-    # Sort the dict relatively to the paths alphabetical order
-    d_sort = sorted(d.items(), key=lambda x: x[1])
-    return d_sort
+    return sorted(d.items(), key=lambda x: x[1])
 
 def sort_group(d, return_only_first=False):
     ''' Sort a dictionary of relative paths and cluster equal paths together at the same time '''
@@ -86,28 +84,24 @@ def sort_group(d, return_only_first=False):
     base_elt = (-1, None)
     while (base_elt[1] is None and d_sort):
         base_elt = d_sort.pop(0)
-    # No element, then we just return
     if base_elt[1] is None:
         return None
-    # Else, we will now group equivalent files together (remember we are working on multiple directories, so we can have multiple equivalent relative filepaths, but of course the absolute filepaths are different).
-    else:
         # Init by creating the first group and pushing the first ordered filepath into the first group
-        lst = []
-        lst.append([base_elt])
-        if d_sort:
-            # For each subsequent filepath
-            for elt in d_sort:
-                # If the filepath is not empty (generator died)
-                if elt[1] is not None:
-                    # If the filepath is the same to the latest grouped filepath, we add it to the same group
-                    if elt[1] == base_elt[1]:
-                        lst[-1].append(elt)
-                    # Else the filepath is different: we create a new group, add the filepath to this group, and replace the latest grouped filepath
-                    else:
-                        if return_only_first: break  # break here if we only need the first group
-                        lst.append([elt])
-                        base_elt = elt # replace the latest grouped filepath
-        return lst
+    lst = [[base_elt]]
+    if d_sort:
+        # For each subsequent filepath
+        for elt in d_sort:
+            # If the filepath is not empty (generator died)
+            if elt[1] is not None:
+                # If the filepath is the same to the latest grouped filepath, we add it to the same group
+                if elt[1] == base_elt[1]:
+                    lst[-1].append(elt)
+                # Else the filepath is different: we create a new group, add the filepath to this group, and replace the latest grouped filepath
+                else:
+                    if return_only_first: break  # break here if we only need the first group
+                    lst.append([elt])
+                    base_elt = elt # replace the latest grouped filepath
+    return lst
 
 def majority_vote_byte_scan(relfilepath, fileslist, outpath, blocksize=65535, default_char_null=False):
     '''Takes a list of files in string format representing the same data, and disambiguate by majority vote: for position in string, if the character is not the same accross all entries, we keep the major one. If none, it will be replaced by a null byte (because we can't know if any of the entries are correct about this character).

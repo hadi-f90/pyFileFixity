@@ -39,9 +39,9 @@ class Hasher(object):
         # Precompute length so that it's very fast to access it later
         if self.algo == "md5":
             self.length = 32
-        elif self.algo == "shortmd5" or self.algo == "shortsha256":
+        elif self.algo in ["shortmd5", "shortsha256"]:
             self.length = 8
-        elif self.algo == "minimd5" or self.algo == "minisha256":
+        elif self.algo in ["minimd5", "minisha256"]:
             self.length = 4
         elif self.algo == "none":
             self.length = 0

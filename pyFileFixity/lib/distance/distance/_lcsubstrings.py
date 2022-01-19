@@ -26,9 +26,9 @@ def lcsubstrings(seq1, seq2, positions=False):
 	if L1 < L2:
 		seq1, seq2 = seq2, seq1
 		L1, L2 = L2, L1
-	
+
 	column = array('L', range(L2))
-	
+
 	for i in range(L1):
 		for j in range(L2):
 			old = column[j]
@@ -45,7 +45,7 @@ def lcsubstrings(seq1, seq2, positions=False):
 			else:
 				column[j] = 0
 			last = old
-	
+
 	if positions:
 		return (mlen, tuple((i - mlen + 1, j - mlen + 1) for i, j in ms if ms))
-	return set(seq1[i - mlen + 1:i + 1] for i, _ in ms if ms)
+	return {seq1[i - mlen + 1:i + 1] for i, _ in ms if ms}

@@ -600,10 +600,7 @@ class RSCoder(object):
         L = [ 0 ] # update flag: necessary variable to check when updating is necessary and to check bounds (to avoid wrongly eliminating the higher order terms). For more infos, see https://www.cs.duke.edu/courses/spring11/cps296.3/decoding_rs.pdf
         M = [ 0 ] # optional variable to check bounds (so that we do not mistakenly overwrite the higher order terms). This is not necessary, it's only an additional safe check. For more infos, see the presentation decoding_rs.pdf by Andrew Brown in the doc folder.
 
-        # Fix the syndrome shifting: when computing the syndrome, some implementations may prepend a 0 coefficient for the lowest degree term (the constant). This is a case of syndrome shifting, thus the syndrome will be bigger than the number of ecc symbols (I don't know what purpose serves this shifting). If that's the case, then we need to account for the syndrome shifting when we use the syndrome such as inside BM, by skipping those prepended coefficients.
-        # Another way to detect the shifting is to detect the 0 coefficients: by definition, a syndrome does not contain any 0 coefficient (except if there are no errors/erasures, in this case they are all 0). This however doesn't work with the modified Forney syndrome (that we do not use in this lib but it may be implemented in the future), which set to 0 the coefficients corresponding to erasures, leaving only the coefficients corresponding to errors.
-        synd_shift = 0
-        if len(s) > (n-k): synd_shift = len(s) - (n-k)
+        synd_shift = len(s) - (n-k) if len(s) > (n-k) else 0
 
         # Polynomial constants:
         ONE = Polynomial(z0=GF2int(1))
@@ -649,8 +646,7 @@ class RSCoder(object):
                 L.append( L[l] )
                 M.append( M[l] )
 
-            elif (Delta != ZERO and 2*L[l] < K+erasures_count) \
-                or (2*L[l] == K+erasures_count and M[l] != 0):
+            elif 2 * L[l] < K + erasures_count or 2 * L[l] == K + erasures_count:
             # elif Delta != ZERO and len(sigma[l+1]) > len(sigma[l]): # another way to compute when to update, and it doesn't require to maintain the update flag L
                 # Rule B
                 B.append( sigma[l] // Delta )
@@ -663,11 +659,6 @@ class RSCoder(object):
 
         # Hack to fix the simultaneous computation of omega, the errata evaluator polynomial: because A (the errata evaluator support polynomial) is not correctly initialized (I could not find any info in academic papers). So at the end, we get the correct errata evaluator polynomial omega + some higher order terms that should not be present, but since we know that sigma is always correct and the maximum degree should be the same as omega, we can fix omega by truncating too high order terms.
         if omega[-1].degree > sigma[-1].degree: omega[-1] = Polynomial(omega[-1].coefficients[-(sigma[-1].degree+1):])
-
-        # Debuglines, uncomment to show the result of every iterations
-        #print "SIGMA BM"
-        #for i,x in enumerate(sigma):
-            #print i, ":", x
 
         # Return the last result of the iterations (since BM compute iteratively, the last iteration being correct - it may already be before, but we're not sure)
         return sigma[-1], omega[-1]
@@ -696,12 +687,7 @@ class RSCoder(object):
             omegaprev = Polynomial([GF2int(1)])
             A = Polynomial([GF2int(0)]) # this is the error evaluator support/secondary polynomial, to help us construct omega
         L = 0 # update flag: necessary variable to check when updating is necessary and to check bounds (to avoid wrongly eliminating the higher order terms). For more infos, see https://www.cs.duke.edu/courses/spring11/cps296.3/decoding_rs.pdf
-        #M = 0 # optional variable to check bounds (so that we do not mistakenly overwrite the higher order terms). This is not necessary, it's only an additional safe check. For more infos, see the presentation decoding_rs.pdf by Andrew Brown in the doc folder.
-
-        # Fix the syndrome shifting: when computing the syndrome, some implementations may prepend a 0 coefficient for the lowest degree term (the constant). This is a case of syndrome shifting, thus the syndrome will be bigger than the number of ecc symbols (I don't know what purpose serves this shifting). If that's the case, then we need to account for the syndrome shifting when we use the syndrome such as inside BM, by skipping those prepended coefficients.
-        # Another way to detect the shifting is to detect the 0 coefficients: by definition, a syndrome does not contain any 0 coefficient (except if there are no errors/erasures, in this case they are all 0). This however doesn't work with the modified Forney syndrome (that we do not use in this lib but it may be implemented in the future), which set to 0 the coefficients corresponding to erasures, leaving only the coefficients corresponding to errors.
-        synd_shift = 0
-        if len(s) > (n-k): synd_shift = len(s) - (n-k)
+        synd_shift = len(s) - (n-k) if len(s) > (n-k) else 0
 
         # Polynomial constants:
         ONE = Polynomial([GF2int(1)])
@@ -903,13 +889,10 @@ class RSCoder(object):
             for ji in _range(t): # do not change to _range(len(X)) as can be seen in some papers, it won't give the correct result! (sometimes yes, but not always)
                 if ji == l:
                     continue
-                if ji < len(X):
-                    Xj = X[ji]
-                else: # if above the maximum degree of the polynomial, then all coefficients above are just 0 (that's logical...)
-                    Xj = GF2int(0)
+                Xj = X[ji] if ji < len(X) else GF2int(0)
                 prod = prod * (Xl - Xj)
-                #if (ji != l):
-                #    prod = prod * (GF2int(1) - X[ji]*(Xl.inverse()))
+                        #if (ji != l):
+                        #    prod = prod * (GF2int(1) - X[ji]*(Xl.inverse()))
 
             # Compute Yl
             Yl = Xl**t * omega.evaluate(Xl_inv) * Xl_inv * prod.inverse()
@@ -933,7 +916,7 @@ class RSCoder(object):
             # compute the product
             sigma_prime = 1
             for coef in sigma_prime_tmp:
-                sigma_prime = sigma_prime * coef
+                sigma_prime *= coef
             # equivalent to: sigma_prime = functools.reduce(mul, sigma_prime, 1)
 
             # Compute Yl

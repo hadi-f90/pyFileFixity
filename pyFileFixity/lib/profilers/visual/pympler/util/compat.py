@@ -65,7 +65,4 @@ def object_in_list(obj, l):
 
     Required compatibility function to handle WeakSet objects.
     """
-    for o in l:
-        if o is obj:
-            return True
-    return False
+    return any(o is obj for o in l)

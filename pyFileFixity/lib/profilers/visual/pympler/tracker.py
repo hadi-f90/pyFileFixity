@@ -116,11 +116,10 @@ class SummaryTracker(object):
             else:
                 res = summary.get_diff(summary1, self.s1)
             self.s0 = self.s1
+        elif summary1 is not None:
+            res = summary.get_diff(summary1, summary2)
         else:
-            if summary1 is not None:
-                res = summary.get_diff(summary1, summary2)
-            else:
-                raise ValueError("You cannot provide summary2 without summary1.")
+            raise ValueError("You cannot provide summary2 without summary1.")
         return summary._sweep(res)
 
     def print_diff(self, summary1=None, summary2=None):
@@ -177,12 +176,7 @@ class ObjectTracker(object):
         ignore -- list of objects to ignore
         """
         def remove_ignore(objects, ignore=[]):
-            # remove all objects listed in the ignore list
-            res = []
-            for o in objects:
-                if not compat.object_in_list(o, ignore):
-                    res.append(o)
-            return res
+            return [o for o in objects if not compat.object_in_list(o, ignore)]
 
         tmp = gc.get_objects()
         ignore.append(inspect.currentframe()) #PYCHOK change ignore

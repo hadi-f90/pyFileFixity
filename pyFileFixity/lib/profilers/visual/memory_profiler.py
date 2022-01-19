@@ -160,7 +160,7 @@ class LineProfiler:
     """ A profiler that records the amount of memory for each line """
 
     def __init__(self, **kw):
-        self.functions = list()
+        self.functions = []
         self.code_map = {}
         self.enable_count = 0
         self.max_mem = kw.get('max_mem', None)
@@ -315,19 +315,17 @@ def show_results(prof, stream=None):
             continue
         all_lines = linecache.getlines(filename)
         sub_lines = inspect.getblock(all_lines[code.co_firstlineno - 1:])
-        linenos = range(code.co_firstlineno, code.co_firstlineno +
-                        len(sub_lines))
-        lines_normalized = {}
-
         header = template.format('Line #', 'Mem usage', 'Increment',
                                  'Line Contents')
+        linenos = range(code.co_firstlineno, code.co_firstlineno +
+                        len(sub_lines))
         stream.write(header + '\n')
         stream.write('=' * len(header) + '\n')
         # move everything one frame up
         keys = sorted(lines.keys())
 
         k_old = keys[0] - 1
-        lines_normalized[keys[0] - 1] = lines[keys[0]]
+        lines_normalized = {keys[0] - 1: lines[keys[0]]}
         for i in range(1, len(lines_normalized[keys[0] - 1])):
             lines_normalized[keys[0] - 1][i] = -1.
         k = keys.pop(0)
@@ -429,14 +427,13 @@ def magic_mprun(self, parameter_s=''):
     __builtin__.__dict__['profile'] = profile
 
     try:
-        try:
-            profile.runctx(arg_str, global_ns, local_ns)
-            message = ''
-        except SystemExit:
-            message = "*** SystemExit exception caught in code being profiled."
-        except KeyboardInterrupt:
-            message = ("*** KeyboardInterrupt exception caught in code being "
-                "profiled.")
+        profile.runctx(arg_str, global_ns, local_ns)
+        message = ''
+    except SystemExit:
+        message = "*** SystemExit exception caught in code being profiled."
+    except KeyboardInterrupt:
+        message = ("*** KeyboardInterrupt exception caught in code being "
+            "profiled.")
     finally:
         if had_profile:
             __builtin__.__dict__['profile'] = old_profile
@@ -452,7 +449,6 @@ def magic_mprun(self, parameter_s=''):
     else:
         page(output)
     print(message,)
-
 #    dump_file = opts.D[0]
 #    if dump_file:
 #        profile.dump_stats(dump_file)
@@ -461,17 +457,12 @@ def magic_mprun(self, parameter_s=''):
 
     text_file = opts.T[0]
     if text_file:
-        pfile = open(text_file, 'w')
-        pfile.write(output)
-        pfile.close()
+        with open(text_file, 'w') as pfile:
+            pfile.write(output)
         print('\n*** Profile printout saved to text file %s. %s' % (text_file,
                                                                     message))
 
-    return_value = None
-    if 'r' in opts:
-        return_value = profile
-
-    return return_value
+    return profile if 'r' in opts else None
 
 
 def _func_exec(stmt, ns):

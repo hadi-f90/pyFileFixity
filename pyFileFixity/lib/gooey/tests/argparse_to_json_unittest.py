@@ -54,10 +54,10 @@ def exclusive_group():
   verbosity.add_argument('-i', dest="option1", action="store_true", help="iii")
   verbosity.add_argument('-j', dest="option2", action="store_true", help="hhh")
 
-  mutually_exclusive_group = [mutex_action
-                              for group_actions in parser._mutually_exclusive_groups
-                              for mutex_action in group_actions._group_actions]
-  return mutually_exclusive_group
+  return [
+      mutex_action for group_actions in parser._mutually_exclusive_groups
+      for mutex_action in group_actions._group_actions
+  ]
 
 
 

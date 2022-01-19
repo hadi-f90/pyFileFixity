@@ -48,12 +48,10 @@ def update_parser_varname(new_varname, code):
   argparse_code = dropwhile(lambda line: 'import' in line, lines)
   old_argparser_varname, _ = split_line(argparse_code.next())
 
-  updated_code = [line.replace(old_argparser_varname, new_varname)
+  return [line.replace(old_argparser_varname, new_varname)
                   for line in lines]
-  return updated_code
 
-if __name__ == '__main__':
-  pass
+pass
 
 
 

@@ -46,10 +46,7 @@ class HotMapNavigator(object):
     def firstChild(hot_map, index):
         ''' Return the first child of the node indicated by index. '''
         children = hot_map[index][2]
-        if children:
-            return children[0][1]
-        else:
-            return hot_map[index][1] # No children, return the node itself
+        return children[0][1] if children else hot_map[index][1]
 
     @staticmethod
     def nextChild(hotmap, index):
@@ -72,10 +69,7 @@ class HotMapNavigator(object):
     def lastNode(class_, hot_map):
         ''' Return the very last node (recursively) in the hot map. '''
         children = hot_map[-1][2]
-        if children:
-            return class_.lastNode(children)
-        else:
-            return hot_map[-1][1] # Return the last node
+        return class_.lastNode(children) if children else hot_map[-1][1]
 
 
 class SquareMap( wx.Panel ):
@@ -269,9 +263,7 @@ class SquareMap( wx.Panel ):
 
     def PenForNode( self, node, depth=0 ):
         """Determine the pen to use to display the given node"""
-        if node == self.selectedNode:
-            return self.SELECTED_PEN
-        return self.DEFAULT_PEN
+        return self.SELECTED_PEN if node == self.selectedNode else self.DEFAULT_PEN
 
     def TextForegroundForNode(self, node, depth=0):
         """Determine the text foreground color to use to display the label of
@@ -435,11 +427,10 @@ def split_by_value( total, nodes, headdivisor=2.0 ):
     head_sum,tail_sum = 0,0
     divider = 0
     for node in nodes[::-1]:
-        if head_sum < total/headdivisor:
-            head_sum += node[0]
-            divider -= 1
-        else:
+        if head_sum >= total / headdivisor:
             break
+        head_sum += node[0]
+        divider -= 1
     return (head_sum,nodes[divider:]),(total-head_sum,nodes[:divider])
 
 
@@ -456,10 +447,10 @@ class DefaultAdapter( object ):
         return node.path
     def overall( self, node ):
         """Calculate overall size of the node including children and empty space"""
-        return sum( [self.value(value,node) for value in self.children(node)] )
+        return sum(self.value(value,node) for value in self.children(node))
     def children_sum( self, children,node ):
         """Calculate children's total sum"""
-        return sum( [self.value(value,node) for value in children] )
+        return sum(self.value(value,node) for value in children)
     def empty( self, node ):
         """Calculate empty space as a fraction of total space"""
         overall = self.overall( node )
@@ -504,7 +495,7 @@ class TestApp(wx.App):
                     nodes.append( Node( full, os.stat( full ).st_size, () ) )
                 elif os.path.isdir( full ):
                     nodes.append( self.get_model( full ))
-        return Node( path, sum([x.size for x in nodes]), nodes )
+        return Node(path, sum(x.size for x in nodes), nodes)
     def OnSquareSelected( self, event ):
         text = self.sq.adapter.label( event.node )
         self.frame.SetToolTipString( text )

@@ -199,8 +199,19 @@ def compute_ecc_hash_from_string(string, ecc_manager, hasher, max_block_size, re
     '''Generate a concatenated string of ecc stream of hash/ecc blocks, of constant encoding rate, given a string.
     NOTE: resilience_rate here is constant, you need to supply only one rate, between 0.0 and 1.0. The encoding rate will then be constant, like in header_ecc.py.'''
     fpfile = StringIO(string)
-    ecc_stream = ''.join( [str(x[1]) for x in stream_compute_ecc_hash(ecc_manager, hasher, fpfile, max_block_size, len(string), [resilience_rate])] ) # "hack" the function by tricking it to always use a constant rate, by setting the header_size=len(relfilepath), and supplying the resilience_rate_intra instead of resilience_rate_s1 (the one for header)
-    return ecc_stream
+    return ''.join(
+        [
+            str(x[1])
+            for x in stream_compute_ecc_hash(
+                ecc_manager,
+                hasher,
+                fpfile,
+                max_block_size,
+                len(string),
+                [resilience_rate],
+            )
+        ]
+    )
 
 def ecc_correct_intra_stream(ecc_manager_intra, ecc_params_intra, hasher_intra, resilience_rate_intra, field, ecc, enable_erasures=False, erasures_char="\x00", only_erasures=False, max_block_size=65535):
     """ Correct an intra-field with its corresponding intra-ecc if necessary """
@@ -260,27 +271,16 @@ except ImportError as exc:
 
 def conditional_decorator(flag, dec):  # pragma: no cover
     def decorate(fn):
-        if flag:
-            return dec(fn)
-        else:
-            return fn
+        return dec(fn) if flag else fn
     return decorate
 
-def check_gui_arg():  # pragma: no cover
+def check_gui_arg():    # pragma: no cover
     '''Check that the --gui argument was passed, and if true, we remove the --gui option and replace by --gui_launched so that Gooey does not loop infinitely'''
-    if len(sys.argv) > 1 and sys.argv[1] == '--gui':
-        # DEPRECATED since Gooey automatically supply a --ignore-gooey argument when calling back the script for processing
-        #sys.argv[1] = '--gui_launched' # CRITICAL: need to remove/replace the --gui argument, else it will stay in memory and when Gooey will call the script again, it will be stuck in an infinite loop calling back and forth between this script and Gooey. Thus, we need to remove this argument, but we also need to be aware that Gooey was called so that we can call gooey.GooeyParser() instead of argparse.ArgumentParser() (for better fields management like checkboxes for boolean arguments). To solve both issues, we replace the argument --gui by another internal argument --gui_launched.
-        return True
-    else:
-        return False
+    return len(sys.argv) > 1 and sys.argv[1] == '--gui'
 
-def AutoGooey(fn):  # pragma: no cover
+def AutoGooey(fn):    # pragma: no cover
     '''Automatically show a Gooey GUI if --gui is passed as the first argument, else it will just run the function as normal'''
-    if check_gui_arg():
-        return gooey.Gooey(fn)
-    else:
-        return fn
+    return gooey.Gooey(fn) if check_gui_arg() else fn
 
 
 

@@ -141,14 +141,8 @@ class GlobbingFilter(object):
             exclude = []
         self.include = include
         self.exclude = exclude
-        if max_depth is None:
-           self.max_depth = max_depth or 9999
-        else:
-           self.max_depth = max_depth
-        if min_depth is None:
-            self.min_depth = 0
-        else:
-            self.min_depth = min_depth or 0
+        self.max_depth = max_depth or 9999 if max_depth is None else max_depth
+        self.min_depth = 0 if min_depth is None else min_depth or 0
 
     def __call__(self, stack, module_name=None, class_name=None,
                  func_name=None, full_name=None):
@@ -160,10 +154,7 @@ class GlobbingFilter(object):
         for pattern in self.exclude:
             if fnmatch(full_name, pattern):
                 return False
-        for pattern in self.include:
-            if fnmatch(full_name, pattern):
-                return True
-        return False
+        return any(fnmatch(full_name, pattern) for pattern in self.include)
 
 
 def is_module_stdlib(file_name):
@@ -190,16 +181,8 @@ def start_trace(reset=True, filter_func=None, time_filter_func=None):
     if reset:
         reset_trace()
 
-    if filter_func:
-        trace_filter = filter_func
-    else:
-        trace_filter = GlobbingFilter(exclude=['pycallgraph.*'])
-
-    if time_filter_func:
-        time_filter = time_filter_func
-    else:
-        time_filter = GlobbingFilter()
-
+    trace_filter = filter_func or GlobbingFilter(exclude=['pycallgraph.*'])
+    time_filter = time_filter_func or GlobbingFilter()
     sys.settrace(tracer)
 
 
@@ -267,10 +250,7 @@ def tracer(frame, event, arg):
         # Store the call information
         if keep:
 
-            if call_stack:
-                fr = call_stack[-1]
-            else:
-                fr = None
+            fr = call_stack[-1] if call_stack else None
             if fr not in call_dict:
                 call_dict[fr] = {}
             if full_name not in call_dict[fr]:
@@ -290,20 +270,16 @@ def tracer(frame, event, arg):
             call_stack.append('')
             call_stack_timer.append(None)
 
-    if event == 'return':
-        if call_stack:
-            full_name = call_stack.pop(-1)
-            if call_stack_timer:
-                t = call_stack_timer.pop(-1)
-            else:
-                t = None
-            if t and time_filter(stack=call_stack, full_name=full_name):
-                if full_name not in func_time:
-                    func_time[full_name] = 0
-                call_time = (time.time() - t)
-                func_time[full_name] += call_time
-                if func_time[full_name] > func_time_max:
-                    func_time_max = func_time[full_name]
+    if event == 'return' and call_stack:
+        full_name = call_stack.pop(-1)
+        t = call_stack_timer.pop(-1) if call_stack_timer else None
+        if t and time_filter(stack=call_stack, full_name=full_name):
+            if full_name not in func_time:
+                func_time[full_name] = 0
+            call_time = (time.time() - t)
+            func_time[full_name] += call_time
+            if func_time[full_name] > func_time_max:
+                func_time_max = func_time[full_name]
 
     return tracer
 
@@ -431,10 +407,8 @@ def make_dot_graph(filename, format='png', tool='dot', stop=True):
         filename = os.path.expandvars(filename)  # expand, just in case
 
     if format == 'dot':
-        f = open(filename, 'w')
-        f.write(dot_data)
-        f.close()
-
+        with open(filename, 'w') as f:
+            f.write(dot_data)
     else:
         # create a temporary file to be used for the dot data
         fd, tempname = tempfile.mkstemp()

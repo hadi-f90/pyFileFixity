@@ -75,11 +75,8 @@ def parse_configfile(filepath):
     # -- Parsing the Makefile using ConfigParser
     # Adding a fake section to make the Makefile a valid Ini file
     ini_str = '[root]\n'
-    if not hasattr(filepath, 'read'):
-        fd = open(filepath, 'r')
-    else:
-        fd = filepath
-    ini_str = ini_str + fd.read().replace('\t@', '\t').\
+    fd = open(filepath, 'r') if not hasattr(filepath, 'read') else filepath
+    ini_str += fd.read().replace('\t@', '\t').\
         replace('\t+', '\t').replace('\tmake ', '\t')
     if fd != filepath: fd.close()
     ini_fp = StringIO(ini_str)
@@ -89,12 +86,10 @@ def parse_configfile(filepath):
     # Fetch the list of aliases
     aliases = config.options('root')
 
-    # -- Extracting commands for each alias
-    commands = {}
-    for alias in aliases:
-        # strip the first line return, and then split by any line return
-        commands[alias] = config.get('root', alias).lstrip('\n').split('\n')
-    return commands
+    return {
+        alias: config.get('root', alias).lstrip('\n').split('\n')
+        for alias in aliases
+    }
 
 def get_filename_no_ext(filepath):
     return os.path.splitext(os.path.basename(filepath))[0]
@@ -111,15 +106,13 @@ def execute_command(cmd, ptee=None, verbose=False):  # pragma: no cover
     if parsed_cmd:
         if verbose:
             print("Running command: " + cmd)
-        #if ptee: ptee.disable()
-        if parsed_cmd[0].lower().startswith('python'):
-            mod = import_module(get_filename_no_ext(parsed_cmd[1]))
-            if mod and hasattr(mod, 'main'):
-                mod.main(parsed_cmd[2:])
-            else:
-                return subprocess.check_call(parsed_cmd)
-        else:
+        if not parsed_cmd[0].lower().startswith('python'):
             # Launch the command and wait to finish (synchronized call)
+            return subprocess.check_call(parsed_cmd)
+        mod = import_module(get_filename_no_ext(parsed_cmd[1]))
+        if mod and hasattr(mod, 'main'):
+            mod.main(parsed_cmd[2:])
+        else:
             return subprocess.check_call(parsed_cmd)
         #if ptee: ptee.enable()
 
@@ -143,13 +136,13 @@ def diff_bytes_files(path1, path2, blocksize=65535, startpos1=0, startpos2=0):
                 if not buf2:
                     curpos = f1.tell()
                     size_remaining = f1.fstat(f1.fileno()).st_size - curpos - len(buf1)
-                elif not buf1:
+                else:
                     curpos = f2.tell()
                     size_remaining = f2.fstat(f2.fileno()).st_size - curpos - len(buf2)
                 diff_count += size_remaining
                 total_size += size_remaining
                 break
-            elif (not buf1 and not buf2):
+            elif not buf1:
                 # End of file for both files
                 break
             else:
@@ -169,11 +162,10 @@ def diff_bytes_dir(dir1, dir2):
         if not os.path.exists(filepath2):
             fsize = os.stat(filepath1).st_size
             total_diff += fsize
-            total_size += fsize
         else:
             fdiff, fsize = diff_bytes_files(filepath1, filepath2)
             total_diff += fdiff
-            total_size += fsize
+        total_size += fsize
     return total_diff, total_size
 
 def diff_count_files(path1, path2, blocksize=65535, startpos1=0, startpos2=0):
@@ -191,7 +183,7 @@ def diff_count_files(path1, path2, blocksize=65535, startpos1=0, startpos2=0):
                 # Reached end of file or the content is different, then return false
                 flag = False
                 break
-            elif (not buf1 and not buf2):
+            elif not buf1:
                 # End of file for both files
                 break
     return flag
@@ -204,21 +196,19 @@ def diff_count_dir(dir1, dir2):
         filepath1 = os.path.join(dirpath, filepath)
         relpath = os.path.relpath(filepath1, dir1)
         filepath2 = os.path.join(dir2, relpath)
-        if not os.path.exists(filepath2):
+        if (
+            os.path.exists(filepath2)
+            and not diff_count_files(filepath1, filepath2)
+            or not os.path.exists(filepath2)
+        ):
             diff_count += 1
-        else:
-            if not diff_count_files(filepath1, filepath2):
-                diff_count += 1
         total_count += 1
     return diff_count, total_count
 
 ######## Stats functions ########
 
 def compute_repair_power(new_error, old_error):
-    if old_error != 0.0:
-        return (1 - (new_error / old_error)) * 100
-    else:
-        return new_error
+    return (1 - (new_error / old_error)) * 100 if old_error != 0.0 else new_error
 
 def compute_diff_stats(orig, dir1, dir2):
     stats = OrderedDict()
@@ -334,27 +324,16 @@ except ImportError as exc:
 
 def conditional_decorator(flag, dec):  # pragma: no cover
     def decorate(fn):
-        if flag:
-            return dec(fn)
-        else:
-            return fn
+        return dec(fn) if flag else fn
     return decorate
 
-def check_gui_arg():  # pragma: no cover
+def check_gui_arg():    # pragma: no cover
     '''Check that the --gui argument was passed, and if true, we remove the --gui option and replace by --gui_launched so that Gooey does not loop infinitely'''
-    if len(sys.argv) > 1 and sys.argv[1] == '--gui':
-        # DEPRECATED since Gooey automatically supply a --ignore-gooey argument when calling back the script for processing
-        #sys.argv[1] = '--gui_launched' # CRITICAL: need to remove/replace the --gui argument, else it will stay in memory and when Gooey will call the script again, it will be stuck in an infinite loop calling back and forth between this script and Gooey. Thus, we need to remove this argument, but we also need to be aware that Gooey was called so that we can call gooey.GooeyParser() instead of argparse.ArgumentParser() (for better fields management like checkboxes for boolean arguments). To solve both issues, we replace the argument --gui by another internal argument --gui_launched.
-        return True
-    else:
-        return False
+    return len(sys.argv) > 1 and sys.argv[1] == '--gui'
 
-def AutoGooey(fn):  # pragma: no cover
+def AutoGooey(fn):    # pragma: no cover
     '''Automatically show a Gooey GUI if --gui is passed as the first argument, else it will just run the function as normal'''
-    if check_gui_arg():
-        return gooey.Gooey(fn)
-    else:
-        return fn
+    return gooey.Gooey(fn) if check_gui_arg() else fn
 
 
 
@@ -392,7 +371,7 @@ Also note that the test folder will not be removed at the end, so that you can s
     #== Commandline arguments
     #-- Constructing the parser
     # Use GooeyParser if we want the GUI because it will provide better widgets
-    if len(argv) > 0 and (argv[0] == '--gui' and not '--ignore-gooey' in argv):  # pragma: no cover
+    if len(argv) > 0 and argv[0] == '--gui' and '--ignore-gooey' not in argv:  # pragma: no cover
         # Initialize the Gooey parser
         main_parser = gooey.GooeyParser(add_help=True, description=desc, epilog=ep, formatter_class=argparse.RawTextHelpFormatter)
         # Define Gooey widget types explicitly (because type auto-detection doesn't work quite well)
@@ -450,9 +429,6 @@ Also note that the test folder will not be removed at the end, so that you can s
     verbose = args.verbose
     silent = args.silent
 
-    #if os.path.isfile(inputpath): # if inputpath is a single file (instead of a folder), then define the rootfolderpath as the parent directory (for correct relative path generation, else it will also truncate the filename!)
-        #rootfolderpath = os.path.dirname(inputpath)
-
     # -- Checking arguments
     if not os.path.isdir(origpath):
         raise NameError("Input path needs to be a directory!")
@@ -467,9 +443,7 @@ Also note that the test folder will not be removed at the end, so that you can s
     else:
         remove_if_exist(outputpath)
 
-    if multiple < 1:
-        multiple = 1
-
+    multiple = max(multiple, 1)
     # -- Configure the log file if enabled (ptee.write() will write to both stdout/console and to the log file)
     if args.log:
         ptee = Tee(args.log[0], 'a', nostdout=silent)
@@ -483,7 +457,7 @@ Also note that the test folder will not be removed at the end, so that you can s
     ptee.write("====================================")
     ptee.write("Resiliency tester, started on %s" % datetime.datetime.now().isoformat())
     ptee.write("====================================")
-    
+
     ptee.write("Testing folder %s into test folder %s for %i run(s)." % (origpath, outputpath, multiple))
 
     fstats = {}
@@ -508,7 +482,7 @@ Also note that the test folder will not be removed at the end, so that you can s
         # Before tampering
         ptee.write("=== BEFORE TAMPERING ===")
         create_dir_if_not_exist(dbdir)
-        for i, cmd in enumerate(commands["before_tamper"]):
+        for cmd in commands["before_tamper"]:
             scmd = interpolate_dict(cmd, interp_args={"inputdir": origpath, "dbdir": dbdir})
             ptee.write("Executing command: %s" % scmd)
             execute_command(scmd, ptee=ptee)
@@ -517,14 +491,14 @@ Also note that the test folder will not be removed at the end, so that you can s
         # Tampering
         ptee.write("=== TAMPERING ===")
         copy_any(origpath, tamperdir)
-        for i, cmd in enumerate(commands["tamper"]):
+        for cmd in commands["tamper"]:
             scmd = interpolate_dict(cmd, interp_args={"inputdir": tamperdir, "dbdir": dbdir})
             ptee.write("- RTEST: Executing command: %s" % scmd)
             execute_command(scmd, ptee=ptee)
 
         # After tampering
         ptee.write("=== AFTER TAMPERING ===")
-        for i, cmd in enumerate(commands["after_tamper"]):
+        for cmd in commands["after_tamper"]:
             scmd = interpolate_dict(cmd, interp_args={"inputdir": tamperdir, "dbdir": dbdir})
             ptee.write("- RTEST: Executing command: %s" % scmd)
             execute_command(scmd, ptee=ptee)
@@ -566,10 +540,7 @@ Also note that the test folder will not be removed at the end, so that you can s
     # Shutting down
     del ptee
     # Completely repair all the files? Return OK
-    if stats["final"]["error"] == 0:
-        return 0
-    else:
-        return 1
+    return 0 if stats["final"]["error"] == 0 else 1
 
 # Calling main function if the script is directly called (not imported as a library in another program)
 if __name__ == "__main__":  # pragma: no cover

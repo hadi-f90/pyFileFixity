@@ -29,5 +29,4 @@ def resize_bitmap(parent, _bitmap, target_height):
 
 
 
-if __name__ == '__main__':
-  pass
+pass

@@ -57,18 +57,13 @@ class ReedSolomon:
 		# validate the divisor
 		if (argY == 0):
 			raise ZeroDivisionError()
-			
-		# validate the dividend
+
 		if (argX == 0):
-			byteValu = 0
-		else:
-			# perform the division
-			byteValu = self.__GFLOG[argX] - self.__GFLOG[argY]
-			byteValu += 255
-			byteValu = self.__GFEXP[byteValu]
-		
-		# return the division result
-		return (byteValu)
+			return 0
+		# perform the division
+		byteValu = self.__GFLOG[argX] - self.__GFLOG[argY]
+		byteValu += 255
+		return self.__GFEXP[byteValu]
 	
 	
 	## GALOIS POLYNOMIAL OPERATIONS
@@ -79,15 +74,15 @@ class ReedSolomon:
 	def _gfPolyAdd(self, polyA, polyB):
 		# initialise the polynomial sum
 		polySum = [0] * max(len(polyA), len(polyB))
-		
+
 		# process the first addend
-		for polyPos in range(0, len(polyA)):
+		for polyPos in range(len(polyA)):
 			polySum[polyPos + len(polySum) - len(polyA)] = polyA[polyPos]
-		
+
 		# add the second addend
-		for polyPos in range(0, len(polyB)):
+		for polyPos in range(len(polyB)):
 			polySum[polyPos + len(polySum) - len(polyB)] ^= polyB[polyPos]
-		
+
 		# return the sum
 		return (polySum)
 		
@@ -99,12 +94,12 @@ class ReedSolomon:
 		# initialise the product
 		polyProd = len(polyA) + len(polyB) - 1
 		polyProd = [0] * polyProd
-		
+
 		# start multiplying
-		for posB in range(0, len(polyB)):
-			for posA in range(0, len(polyA)):
+		for posB in range(len(polyB)):
+			for posA in range(len(polyA)):
 				polyProd[posA + posB] ^= self.__gfMult(polyA[posA], polyB[posB])
-		
+
 		# return the product result
 		return (polyProd)
 	
@@ -116,11 +111,11 @@ class ReedSolomon:
 	def _gfPolyScale(self, argPoly, argX):
 		# initialise the scaled polynomial
 		polyVal = [0] * len(argPoly)
-		
+
 		# start scaling
-		for polyPos in range(0, len(argPoly)):
+		for polyPos in range(len(argPoly)):
 			polyVal[polyPos] = self.__gfMult(argPoly[polyPos], argX)
-		
+
 		# return the scaled polynomial
 		return (polyVal)
 	
@@ -151,11 +146,11 @@ class ReedSolomon:
 	# polyValu: generator polynomial
 	def _rsGenPoly(self, errSize):
 		polyValu = [1]
-		
-		for polyPos in range(0, errSize):
+
+		for polyPos in range(errSize):
 			tempVal = [1, self.__GFEXP[polyPos]]
 			polyValu = self._gfPolyMult(polyValu, tempVal)
-		
+
 		# return the polynomial result
 		return (polyValu)
 	
@@ -170,29 +165,29 @@ class ReedSolomon:
 		
 		# prepare the generator polynomial
 		polyGen = self._rsGenPoly(errSize)
-		
+
 		# prepare the output buffer
 		outBuffer = (len(argMesg) + errSize)
 		outBuffer = [0] * outBuffer
-		
+
 		# initialise the output buffer
-		for mesgPos in range(0, len(argMesg)):
+		for mesgPos in range(len(argMesg)):
 			mesgChar = argMesg[mesgPos]
 			outBuffer[mesgPos] = ord(mesgChar)
-		
+
 		# begin encoding
-		for mesgPos in range(0, len(argMesg)):
+		for mesgPos in range(len(argMesg)):
 			mesgChar = outBuffer[mesgPos]
 			if (mesgChar != 0):
-				for polyPos in range(0, len(polyGen)):
+				for polyPos in range(len(polyGen)):
 					tempValu = self.__gfMult(polyGen[polyPos], mesgChar)
 					outBuffer[mesgPos + polyPos] ^= tempValu
-		
+
 		# finalise the output buffer
-		for mesgPos in range(0, len(argMesg)):
+		for mesgPos in range(len(argMesg)):
 			mesgChar = argMesg[mesgPos]
 			outBuffer[mesgPos] = ord(mesgChar)
-		
+
 		# return the output buffer
 		return (outBuffer)
 	
@@ -206,12 +201,12 @@ class ReedSolomon:
 	def _rsSyndPoly(self, argCode, errSize):
 		# initialise the polynomial
 		polyValu = [0] * errSize
-		
+
 		# compute the polynomial terms
-		for errPos in range(0, errSize):
+		for errPos in range(errSize):
 			byteValu = self.__GFEXP[errPos] 
 			polyValu[errPos] = self._gfPolyEval(argCode, byteValu)
-		
+
 		# return the polynomial
 		return (polyValu)
 	
@@ -223,17 +218,17 @@ class ReedSolomon:
 	def _rsForney(self, polySynd, eraseLoci, errSize):
 		# make a copy of the syndrome polynomial
 		polyValu = list(polySynd)
-		
+
 		# compute the polynomial terms
-		for posI in range(0, len(eraseLoci)):
+		for posI in range(len(eraseLoci)):
 			termX = errSize - 1 - eraseLoci[posI]
 			termX = self.__GFEXP[termX]
-			for posJ in range(0, len(polyValu) - 1):
+			for posJ in range(len(polyValu) - 1):
 				termY = self.__gfMult(polyValu[posJ], termX)
 				termY ^= polyValu[posJ + 1]
 				polyValu[posJ] = termY
 			polyValu.pop()
-		
+
 		# return the polynomial result
 		return (polyValu)
 	
@@ -294,32 +289,32 @@ class ReedSolomon:
 	def _rsCorrect(self, argCode, polySynd, errList):
 		# prepare the locator polynomial
 		polyLoci = [1]
-		for errPos in range(0, len(errList)):
+		for errPos in range(len(errList)):
 			errTerm = len(argCode) - errList[errPos] - 1
 			errTerm = self.__GFEXP[errTerm]
 			polyLoci = self._gfPolyMult(polyLoci, [errTerm, 1])
-		
+
 		# prepare the error evaluator polynomial
-		errEval = polySynd[0:len(errList)]
+		errEval = polySynd[:len(errList)]
 		errEval.reverse()
 		errEval = self._gfPolyMult(errEval, polyLoci)
-		
+
 		tMark = len(errEval) - len(errList)
 		errEval = errEval[tMark:len(errEval)]
-		
+
 		# the error locator polynomial, minus even terms
 		errLoci = polyLoci[len(polyLoci) % 1 : len(polyLoci) : 2]
-		
+
 		# start correcting
-		for errPos in range(0, len(errList)):
+		for errPos in range(len(errList)):
 			errByte = errList[errPos] - len(argCode) + 256
 			errByte = self.__GFEXP[errByte]
-			
+
 			errValu = self._gfPolyEval(errEval, errByte)
-			
+
 			errAdj = self.__gfMult(errByte, errByte)
 			errAdj = self._gfPolyEval(errLoci, errAdj)
-			
+
 			mesgByte = self.__gfMult(errByte, errAdj)
 			mesgByte = self.__gfDivi(errValu, mesgByte)
 			argCode[errList[errPos]] ^= mesgByte

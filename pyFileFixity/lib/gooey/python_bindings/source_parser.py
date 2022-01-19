@@ -50,14 +50,13 @@ def parse_source_file(file_name):
   add_arg_assignments  = get_nodes_by_containing_attr(call_objects, 'add_argument')
   parse_args_assignment = get_nodes_by_containing_attr(call_objects, 'parse_args')
 
-  ast_argparse_source = chain(
+  return chain(
     module_imports,
     specific_imports,
     argparse_assignments,
     add_arg_assignments
     # parse_args_assignment
   )
-  return ast_argparse_source
 
 def _openfile(file_name):
   with open(file_name, 'rb') as f:
@@ -79,9 +78,9 @@ def walk_tree(node):
   for key, value in d.iteritems():
     if isinstance(value, list):
       for val in value:
-        for _ in walk_tree(val): yield _
+        yield from walk_tree(val)
     elif 'ast' in str(type(value)):
-      for _ in walk_tree(value): yield _
+      yield from walk_tree(value)
     else:
       yield value
 
@@ -155,7 +154,7 @@ def extract_parser(modulepath, func_with_argparse):
 
 
 def has_argparse(source):
-  return any(['.parse_args(' in line.lower() for line in source.split('\n')])
+  return any('.parse_args(' in line.lower() for line in source.split('\n'))
 
 if __name__ == '__main__':
   filepath = os.path.join(os.path.dirname(__file__),

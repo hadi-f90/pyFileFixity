@@ -89,7 +89,7 @@ class Polynomial(object):
         if not poly:
             return self.degree
             #return len(self.coefficients) - 1
-        elif poly and hasattr("coefficients", poly):
+        elif hasattr("coefficients", poly):
             return len(poly.coefficients) - 1
         else:
             while poly and poly[-1] == 0:
@@ -370,10 +370,7 @@ class Polynomial(object):
 
     def get_coefficient(self, degree):
         '''Returns the coefficient of the specified term'''
-        if degree > self.degree:
-            return 0
-        else:
-            return self.coefficients[-(degree+1)]
+        return 0 if degree > self.degree else self.coefficients[-(degree+1)]
     
     def __iter__(self):
         return iter(self.coefficients)

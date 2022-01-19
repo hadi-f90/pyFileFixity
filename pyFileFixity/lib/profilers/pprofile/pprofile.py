@@ -189,10 +189,7 @@ class ProfileBase(object):
 
     def _iterFile(self, name, call_list_by_line):
         lineno = 0
-        if call_list_by_line:
-            last_call_line = max(call_list_by_line)
-        else:
-            last_call_line = 0
+        last_call_line = max(call_list_by_line) if call_list_by_line else 0
         file_timing = self.file_dict[name]
         while True:
             lineno += 1
@@ -247,10 +244,7 @@ class ProfileBase(object):
         print >> out, 'event: usphit :us/hit'
         print >> out, 'events: hits us usphit'
         file_dict = self.file_dict
-        if relative_path:
-            convertPath = _relpath
-        else:
-            convertPath = lambda x: x
+        convertPath = _relpath if relative_path else (lambda x: x)
         for name in self._getFileNameList(filename):
             printable_name = convertPath(name)
             print >> out, 'fl=%s' % printable_name
@@ -265,13 +259,16 @@ class ProfileBase(object):
                     func, firstlineno = call_list[0][:2]
                 if funcname != func:
                     funcname = func
-                    print >> out, 'fn=%s' % _getFuncOrFile(func,
-                        printable_name, firstlineno)
+                    (
+                        print >> out,
+                        (
+                            'fn=%s'
+                            % _getFuncOrFile(funcname, printable_name, firstlineno)
+                        ),
+                    )
+
                 ticks = int(duration * 1000000)
-                if hits == 0:
-                    ticksperhit = 0
-                else:
-                    ticksperhit = ticks / hits
+                ticksperhit = 0 if hits == 0 else ticks / hits
                 print >> out, lineno, hits, ticks, int(ticksperhit)
                 for _, _, hits, duration, callee_file, callee_line, \
                         callee_name in sorted(call_list, key=lambda x: x[2:4]):
@@ -307,9 +304,7 @@ class ProfileBase(object):
         if not total_time:
             return
         def percent(value, scale):
-            if scale == 0:
-                return 0
-            return value * 100 / float(scale)
+            return 0 if scale == 0 else value * 100 / float(scale)
         for name in self._getFileNameList(filename):
             file_timing = file_dict[name]
             file_total_time = file_timing.getTotalTime()
@@ -512,7 +507,7 @@ class Profile(ProfileBase, ProfileRunnerBase):
         return local_trace
 
     def _local_trace(self, frame, event, arg):
-        if event == 'line' or event == 'return':
+        if event in ['line', 'return']:
             event_time = time()
             stack = self.stack
             try:
@@ -700,16 +695,12 @@ class StatisticalThread(threading.Thread, ProfileRunnerBase):
 
 # profile/cProfile-like API (no sort parameter !)
 def _run(threads, verbose, func_name, filename, *args, **kw):
-    if threads:
-        klass = ThreadProfile
-    else:
-        klass = Profile
+    klass = ThreadProfile if threads else Profile
     prof = klass(verbose=verbose)
     try:
-        try:
-            getattr(prof, func_name)(*args, **kw)
-        except SystemExit:
-            pass
+        getattr(prof, func_name)(*args, **kw)
+    except SystemExit:
+        pass
     finally:
         if filename is None:
             prof.print_stats()
@@ -787,10 +778,7 @@ def main():
             single=not options.threads,
         )
     else:
-        if options.threads:
-            klass = ThreadProfile
-        else:
-            klass = Profile
+        klass = ThreadProfile if options.threads else Profile
         prof = klass(verbose=options.verbose)
     try:
         prof.runpath(options.script, args)
@@ -809,10 +797,7 @@ def main():
         close()
         zip_path = options.zipfile
         if zip_path:
-            if relative_path:
-                convertPath = _relpath
-            else:
-                convertPath = lambda x: x
+            convertPath = _relpath if relative_path else (lambda x: x)
             with zipfile.ZipFile(
                         zip_path,
                         mode='w',

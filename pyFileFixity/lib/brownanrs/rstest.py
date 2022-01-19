@@ -52,10 +52,7 @@ class TestRScheck(unittest.TestCase):
             # Change the value at position i and check that the code is not
             # valid
             # Change it to a 0, unless it's already a 0
-            if ord(c) == 0:
-                c = chr(1)
-            else:
-                c = chr(0)
+            c = chr(1) if ord(c) == 0 else chr(0)
             bad_code = code[:i] + c + code[i+1:]
 
             self.assertFalse(self.coder.check(bad_code))
@@ -111,7 +108,7 @@ class TestRSdecoding(unittest.TestCase):
         This test is long and probably unnecessary (if it decodes with 1 byte error in any position, it should also work with 2 in any position).'''
         # Test disabled, it takes too long
         for i1, i2 in itertools.combinations(range(len(self.code)), 2):
-            r = list(ord(x) for x in self.code)
+            r = [ord(x) for x in self.code]
 
             # increment the byte by 50
             r[i1] = (r[i1] + 50) % 256
@@ -124,7 +121,7 @@ class TestRSdecoding(unittest.TestCase):
     def test_16err(self):
         '''Tests if 16 byte errors still decodes'''
         errors = [5, 6, 12, 13, 38, 40, 42, 47, 50, 57, 58, 59, 60, 61, 62, 65]
-        r = list(ord(x) for x in self.code)
+        r = [ord(x) for x in self.code]
 
         for e in errors:
             r[e] = (r[e] + 50) % 256
@@ -136,7 +133,7 @@ class TestRSdecoding(unittest.TestCase):
     def test_16err_fast(self):
         '''Tests if 16 byte errors still decodes with the fast method'''
         errors = [5, 6, 12, 13, 38, 40, 42, 47, 50, 57, 58, 59, 60, 61, 62, 65]
-        r = list(ord(x) for x in self.code)
+        r = [ord(x) for x in self.code]
 
         for e in errors:
             r[e] = (r[e] + 50) % 256
@@ -151,7 +148,7 @@ class TestRSdecoding(unittest.TestCase):
         so this test shouldn't be here at all.'''
         errors = [5, 6, 12, 13, 22, 38, 40, 42, 47, 50, 57, 58, 59, 60, 61, 62,
                 65]
-        r = list(ord(x) for x in self.code)
+        r = [ord(x) for x in self.code]
 
         for e in errors:
             r[e] = (r[e] + 50) % 256
@@ -274,7 +271,7 @@ class TestOtherConfig(unittest.TestCase):
                 208, 209, 210, 211, 212, 216, 219, 222, 224, 225, 226, 228,
                 230, 232, 234, 235, 237, 238, 240, 242, 244, 245, 248, 249,
                 250, 253]
-        c = list(ord(x) for x in code)
+        c = [ord(x) for x in code]
         for pos in changes:
             c[pos] = (c[pos] + 50) % 255
 
@@ -295,7 +292,7 @@ class TestOtherConfig(unittest.TestCase):
         # Change 10 bytes. This code should tolerate up to 10 bytes changed
         changes = [0, 1, 2, 4, 7,
                 10, 14, 18, 22, 27]
-        c = list(ord(x) for x in code)
+        c = [ord(x) for x in code]
         for pos in changes:
             c[pos] = (c[pos] + 50) % 255
 
