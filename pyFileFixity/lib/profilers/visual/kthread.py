@@ -53,16 +53,12 @@ class KThread(threading.Thread):
     self.run = self.__run_backup
 
   def globaltrace(self, frame, why, arg):
-    if why == 'call':
-      return self.localtrace
-    else:
-      return None
+      return self.localtrace if why == 'call' else None
 
   def localtrace(self, frame, why, arg):
-    if self.killed:
-      if why == 'line':
-        raise SystemExit()
-    return self.localtrace
+      if self.killed and why == 'line':
+          raise SystemExit()
+      return self.localtrace
 
   def kill(self):
     self.killed = True
@@ -71,7 +67,7 @@ if __name__ == '__main__':
     
     def func():
         print('Function started')
-        for i in xrange(1000000):
+        for _ in xrange(1000000):
             pass
         print('Function finished')
 

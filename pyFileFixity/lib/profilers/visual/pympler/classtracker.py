@@ -91,11 +91,11 @@ class TrackedObject(object):
         dict) are not pickled as those can be reconstructed based on the other
         data. References cannot be serialized, ignore 'ref' as well.
         """
-        state = {}
-        for name in getattr(TrackedObject, '__slots__', ()):
-            if hasattr(self, name) and name not in ['ref', '__dict__']:
-                state[name] = getattr(self, name)
-        return state
+        return {
+            name: getattr(self, name)
+            for name in getattr(TrackedObject, '__slots__', ())
+            if hasattr(self, name) and name not in ['ref', '__dict__']
+        }
 
 
     def __setstate__(self, state):
@@ -136,7 +136,7 @@ class TrackedObject(object):
         """
         Get the maximum of all sampled sizes.
         """
-        return max([s.size for (_, s) in self.snapshots])
+        return max(s.size for (_, s) in self.snapshots)
 
     def get_size_at_time(self, timestamp):
         """
@@ -384,7 +384,7 @@ class ClassTracker(object):
 
         if name is None:
             name = instance.__class__.__name__
-        if not name in self.index:
+        if name not in self.index:
             self.index[name] = []
         self.index[name].append(tobj)
         self.objects[id(instance)] = tobj

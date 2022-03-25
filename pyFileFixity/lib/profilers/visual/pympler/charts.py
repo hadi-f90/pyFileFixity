@@ -42,10 +42,10 @@ try:
         axis.set_ylabel("Virtual Memory [MiB]")
 
         totals = [x.asizeof_total for x in stats.snapshots]
-        totals = [float(x)/(1024*1024) for x in totals]
+        totals = [float(x) / 1024**2 for x in totals]
         axis.plot(timestamps, totals, 'r--', label='Total')
         tracked = [x.tracked_total for x in stats.snapshots]
-        tracked = [float(x)/(1024*1024) for x in tracked]
+        tracked = [float(x) / 1024**2 for x in tracked]
         axis.plot(timestamps, tracked, 'b--', label='Tracked total')
 
         for (args, kwds) in polys:

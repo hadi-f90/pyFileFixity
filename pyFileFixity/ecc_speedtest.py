@@ -69,8 +69,6 @@ def main(argv=None):
     resilience_rate = 0.2
     ecc_algo = 3
     msg_nb = 1000000
-    tamper_rate = 0.4 # tamper rate is relative to the number of ecc bytes, not the whole message (not like the resilience_rate)
-    tamper_mode = 'noise' # noise or erasure
     no_decoding = True
 
     # Precompute some parameters and load up ecc manager objects (big optimization as g_exp and g_log tables calculation is done only once)
@@ -98,12 +96,14 @@ def main(argv=None):
         bardisp.update(max_block_size)
     bardisp.close()
     print("Encoding: total time elapsed: %f sec for %s of data. Real Speed (only encoding, no other computation): %s." % (total_time, format_sizeof(total_size, 'B'), format_sizeof(total_size/total_time, 'B/sec') ))
-    
+
     # -- Decoding test
     if not no_decoding:
         total_time = 0
         total_size = msg_nb*max_block_size
         bardisp = tqdm.tqdm(total=total_size, leave=True, desc='ENC', unit='B', unit_scale=True) # display progress bar based on the number of bytes encoded
+        tamper_rate = 0.4 # tamper rate is relative to the number of ecc bytes, not the whole message (not like the resilience_rate)
+        tamper_mode = 'noise' # noise or erasure
         # Generate a random string and encode it
         for msg in gen_random_string(msg_nb, ecc_params["message_size"]):
             # Computing the ecc first
@@ -116,9 +116,9 @@ def main(argv=None):
             msg_tampered = bytearray(msg)
             # Tamper the characters
             for pos in tamper_idx:
-                if tamper_mode == 'n' or tamper_mode == 'noise': # Noising the character (set a random ASCII character)
+                if tamper_mode in {'n', 'noise'}: # Noising the character (set a random ASCII character)
                     msg_tampered[pos] = random.randint(0,255)
-                elif tamper_mode == 'e' or tamper_mode == 'erasure': # Erase the character (set a null byte)
+                elif tamper_mode in {'e', 'erasure'}: # Erase the character (set a null byte)
                     msg_tampered[pos] = 0
             # Convert back to a string
             msg_tampered = str(msg_tampered)
@@ -132,7 +132,6 @@ def main(argv=None):
                 if not ecc_manager.check(msg_repaired, ecc_repaired): raise ReedSolomonError
             except ReedSolomonError:
                 print("Warning, there was an error while decoding. Please check your parameters (tamper_rate not too high) or the decoding procedure.")
-                pass
             total_time += time.clock() - start
             bardisp.update(max_block_size)
         bardisp.close()

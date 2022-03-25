@@ -21,6 +21,7 @@ Planned:
             
 
 """
+
 import wx, sys, os, logging, imp
 import wx.lib.newevent
 log = logging.getLogger( __name__ )
@@ -29,10 +30,10 @@ from squaremap import squaremap
 import meliaeloader
 
 RANKS = [
-    (1024*1024*1024,'%0.1fGB'),
-    (1024*1024,'%0.1fMB'),
-    (1024,'%0.1fKB'),
-    (0,'%iB'),
+    (1024 ** 2 * 1024, '%0.1fGB'),
+    (1024 ** 2, '%0.1fMB'),
+    (1024, '%0.1fKB'),
+    (0, '%iB'),
 ]
 
 def mb( value ):
@@ -66,7 +67,7 @@ class MeliaeAdapter( squaremap.DefaultAdapter ):
             result.append( node['name'] )
         elif node.get('value') is not None:
             result.append( unicode(node['value'])[:32])
-        if 'module' in node and not node['module'] in result:
+        if 'module' in node and node['module'] not in result:
             result.append( ' in %s'%( node['module'] ))
         if node.get( 'size' ):
             result.append( '%s'%( mb( node['size'] )))
@@ -79,16 +80,12 @@ class MeliaeAdapter( squaremap.DefaultAdapter ):
     def overall( self, node ):
         return node.get('totsize',0)
     def empty( self, node ):
-        if node.get('totsize'):
-            return node['size']/float(node['totsize'])
-        else:
-            return 0
+        return node['size']/float(node['totsize']) if node.get('totsize') else 0
     def parents( self, node ):
         """Retrieve/calculate the set of parents for the given node"""
         if 'index' in node:
             index = node['index']()
-            parents = list(meliaeloader.children( node, index, 'parents' ))
-            return parents 
+            return list(meliaeloader.children( node, index, 'parents' ))
         return []
     def best_parent( self, node, tree_type=None ):
         """Choose the best parent for a given node"""
@@ -110,10 +107,7 @@ class MeliaeAdapter( squaremap.DefaultAdapter ):
         """Create a (unique-ish) background color for each node"""
         if self.color_mapping is None:
             self.color_mapping = {}
-        if node['type'] == 'type':
-            key = node['name']
-        else:
-            key = node['type']
+        key = node['name'] if node['type'] == 'type' else node['type']
         color = self.color_mapping.get(key)
         if color is None:
             depth = len(self.color_mapping)

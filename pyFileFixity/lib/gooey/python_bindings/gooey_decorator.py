@@ -108,5 +108,4 @@ def cleanup(descriptor, filepath):
   os.remove(filepath)
 
 
-if __name__ == '__main__':
-  pass
+pass

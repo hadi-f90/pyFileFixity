@@ -67,11 +67,9 @@ class BaseWindow(wx.Frame):
 
     if self.build_spec['layout_type'] == 'column':
       self.config_panel = layouts.ColumnLayout(self, build_spec=self.build_spec)
-      sizer.Add(self.config_panel, 1, wx.EXPAND)
     else:
       self.config_panel = layouts.FlatLayout(self, build_spec=self.build_spec)
-      sizer.Add(self.config_panel, 1, wx.EXPAND)
-
+    sizer.Add(self.config_panel, 1, wx.EXPAND)
     sizer.Add(self.runtime_display, 1, wx.EXPAND)
 
     self.runtime_display.Hide()
@@ -139,5 +137,4 @@ class BaseWindow(wx.Frame):
     self.runtime_display.cmd_textbox.AppendText(text)
 
 
-if __name__ == '__main__':
-  pass
+pass

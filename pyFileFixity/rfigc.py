@@ -72,28 +72,23 @@ except ImportError:
 if structure_check_import:
     PIL.Image.init() # Init PIL to access its supported formats
     img_filter = ['.'+x.lower() for x in PIL.Image.OPEN.keys()] # Load the supported formats
-    img_filter = img_filter + ['.jpg', '.jpe'] # Add some extensions variations
+    img_filter += ['.jpg', '.jpe']
 def check_structure(filepath):
     """Returns False if the file is okay, None if file format is unsupported by PIL/PILLOW, or returns an error string if the file is corrupt."""
-    #http://stackoverflow.com/questions/1401527/how-do-i-programmatically-check-whether-an-image-png-jpeg-or-gif-is-corrupted/1401565#1401565
-    
-    # Check structure only for images (not supported for other types currently)
-    if filepath.lower().endswith(tuple(img_filter)):
-        try:
-            #try:
-            im = PIL.Image.open(filepath)
-            #except IOError: # File format not supported by PIL, we skip the check_structure - ARG this is also raised if a supported image file is corrupted...
-                #print("File: %s: DETECTNOPE" % filepath)
-                #return None
-            im.verify()
-        # If an error occurred, the structure is corrupted
-        except Exception as e:
-            return str(e)
-        # Else no exception, there's no corruption
-        return False
-    # Else the format does not currently support structure checking, we just return None to signal we didin't check
-    else:
+    if not filepath.lower().endswith(tuple(img_filter)):
         return None
+    try:
+        #try:
+        im = PIL.Image.open(filepath)
+        #except IOError: # File format not supported by PIL, we skip the check_structure - ARG this is also raised if a supported image file is corrupted...
+            #print("File: %s: DETECTNOPE" % filepath)
+            #return None
+        im.verify()
+    # If an error occurred, the structure is corrupted
+    except Exception as e:
+        return str(e)
+    # Else no exception, there's no corruption
+    return False
 
 def generate_hashes(filepath, blocksize=65536):
     '''Generate several hashes (md5 and sha1) in a single sweep of the file. Using two hashes lowers the probability of collision and false negative (file modified but the hash is the same). Supports big files by streaming blocks by blocks to the hasher automatically. Blocksize can be any multiple of 128.'''
@@ -132,27 +127,16 @@ except ImportError as exc:
 
 def conditional_decorator(flag, dec):  # pragma: no cover
     def decorate(fn):
-        if flag:
-            return dec(fn)
-        else:
-            return fn
+        return dec(fn) if flag else fn
     return decorate
 
-def check_gui_arg():  # pragma: no cover
+def check_gui_arg():    # pragma: no cover
     '''Check that the --gui argument was passed, and if true, we remove the --gui option and replace by --gui_launched so that Gooey does not loop infinitely'''
-    if len(sys.argv) > 1 and sys.argv[1] == '--gui':
-        # DEPRECATED since Gooey automatically supply a --ignore-gooey argument when calling back the script for processing
-        #sys.argv[1] = '--gui_launched' # CRITICAL: need to remove/replace the --gui argument, else it will stay in memory and when Gooey will call the script again, it will be stuck in an infinite loop calling back and forth between this script and Gooey. Thus, we need to remove this argument, but we also need to be aware that Gooey was called so that we can call gooey.GooeyParser() instead of argparse.ArgumentParser() (for better fields management like checkboxes for boolean arguments). To solve both issues, we replace the argument --gui by another internal argument --gui_launched.
-        return True
-    else:
-        return False
+    return len(sys.argv) > 1 and sys.argv[1] == '--gui'
 
-def AutoGooey(fn):  # pragma: no cover
+def AutoGooey(fn):    # pragma: no cover
     '''Automatically show a Gooey GUI if --gui is passed as the first argument, else it will just run the function as normal'''
-    if check_gui_arg():
-        return gooey.Gooey(fn)
-    else:
-        return fn
+    return gooey.Gooey(fn) if check_gui_arg() else fn
 
 
 

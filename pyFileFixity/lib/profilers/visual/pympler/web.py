@@ -56,7 +56,7 @@ class ServerState(threading.local):
         self.stats = None
         self.garbage_graphs = None
         self.id2ref = WeakValueDictionary()
-        self.id2obj = dict()
+        self.id2obj = {}
 
 
     def clear_cache(self):
@@ -116,36 +116,37 @@ def process():
 def tracker_index():
     """Get tracker overview."""
     stats = server.stats
-    if stats and stats.snapshots:
-        stats.annotate()
-        timeseries = []
-        for cls in stats.tracked_classes:
-            series = []
-            for snapshot in stats.snapshots:
-                series.append(snapshot.classes.get(cls, {}).get('sum', 0))
-            timeseries.append((cls, series))
-
-        series = [s.overhead for s in stats.snapshots]
-        timeseries.append(("Profiling overhead", series))
-
-        if stats.snapshots[0].system_total.data_segment:
-            # Assume tracked data resides in the data segment
-            series = [s.system_total.data_segment - s.tracked_total - s.overhead
-                      for s in stats.snapshots]
-            timeseries.append(("Data segment", series))
-            series = [s.system_total.code_segment for s in stats.snapshots]
-            timeseries.append(("Code segment", series))
-            series = [s.system_total.stack_segment for s in stats.snapshots]
-            timeseries.append(("Stack segment", series))
-            series = [s.system_total.shared_segment for s in stats.snapshots]
-            timeseries.append(("Shared memory", series))
-        else:
-            series = [s.total - s.tracked_total - s.overhead
-                      for s in stats.snapshots]
-            timeseries.append(("Other", series))
-        return dict(snapshots=stats.snapshots, timeseries=timeseries)
-    else:
+    if not stats or not stats.snapshots:
         return dict(snapshots=[])
+    stats.annotate()
+    timeseries = []
+    for cls in stats.tracked_classes:
+        series = [
+            snapshot.classes.get(cls, {}).get('sum', 0)
+            for snapshot in stats.snapshots
+        ]
+
+        timeseries.append((cls, series))
+
+    series = [s.overhead for s in stats.snapshots]
+    timeseries.append(("Profiling overhead", series))
+
+    if stats.snapshots[0].system_total.data_segment:
+        # Assume tracked data resides in the data segment
+        series = [s.system_total.data_segment - s.tracked_total - s.overhead
+                  for s in stats.snapshots]
+        timeseries.append(("Data segment", series))
+        series = [s.system_total.code_segment for s in stats.snapshots]
+        timeseries.append(("Code segment", series))
+        series = [s.system_total.stack_segment for s in stats.snapshots]
+        timeseries.append(("Stack segment", series))
+        series = [s.system_total.shared_segment for s in stats.snapshots]
+        timeseries.append(("Shared memory", series))
+    else:
+        series = [s.total - s.tracked_total - s.overhead
+                  for s in stats.snapshots]
+        timeseries.append(("Other", series))
+    return dict(snapshots=stats.snapshots, timeseries=timeseries)
 
 
 @bottle.route('/tracker/class/:clsname')
@@ -184,15 +185,22 @@ def get_traceback(threadid):
 @bottle.route('/objects/:oid')
 @bottle.view('referents')
 def get_obj_referents(oid):
-    referents = {}
     obj = get_obj(oid)
     if type(obj) is dict:
         named_objects = asizeof.named_refs(obj)
     else:
         refs = asizeof._getreferents(obj)
         named_objects = [(repr(type(x)), x) for x in refs]
-    for name, o in named_objects:
-        referents[name] = (get_ref(o), type(o).__name__, safe_repr(o, clip=48), asizeof.asizeof(o))
+    referents = {
+        name: (
+            get_ref(o),
+            type(o).__name__,
+            safe_repr(o, clip=48),
+            asizeof.asizeof(o),
+        )
+        for name, o in named_objects
+    }
+
     return dict(referents=referents)
 
 

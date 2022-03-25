@@ -41,10 +41,7 @@ def trunc(obj, max, left=0):
     s = str(obj)
     s = s.replace('\n', '|')
     if len(s) > max:
-        if left:
-            return '...'+s[len(s)-max+3:]
-        else:
-            return s[:(max-3)]+'...'
+        return '...'+s[len(s)-max+3:] if left else s[:(max-3)]+'...'
     else:
         return s
 

@@ -190,10 +190,7 @@ def _calcsize(fmt):
     '''struct.calcsize() handling 'z' for Py_ssize_t.
     '''
      # sizeof(long) != sizeof(ssize_t) on LLP64
-    if _sizeof_Clong < _sizeof_Cvoidp: # pragma: no coverage
-        z = 'P'
-    else:
-        z = 'L'
+    z = 'P' if _sizeof_Clong < _sizeof_Cvoidp else 'L'
     return calcsize(fmt.replace('z', z))
 
  # defaults for some basic sizes with 'z' for C Py_ssize_t
@@ -201,7 +198,6 @@ _sizeof_CPyCodeObject   = _calcsize('Pz10P5i0P')    # sizeof(PyCodeObject)
 _sizeof_CPyFrameObject  = _calcsize('Pzz13P63i0P')  # sizeof(PyFrameObject)
 _sizeof_CPyModuleObject = _calcsize('PzP0P')        # sizeof(PyModuleObject)
 
- # defaults for some item sizes with 'z' for C Py_ssize_t
 _sizeof_CPyDictEntry    = _calcsize('z2P')  # sizeof(PyDictEntry)
 _sizeof_Csetentry       = _calcsize('lP')   # sizeof(setentry)
 
@@ -232,13 +228,7 @@ except (ImportError, AttributeError):  # sizeof(PyGC_Head)
     _sizeof_CPyGC_Head = (_calcsize('2Pz') + t) & ~t
 del t
 
- # size of refcounts (Python debug build only)
-if hasattr(sys, 'gettotalrefcount'): # pragma: no coverage
-    _sizeof_Crefcounts = _calcsize('2z')
-else:
-    _sizeof_Crefcounts =  0
-
- # some flags from .../Include/object.h
+_sizeof_Crefcounts = _calcsize('2z') if hasattr(sys, 'gettotalrefcount') else 0
 _Py_TPFLAGS_HEAPTYPE = 1 <<  9  # Py_TPFLAGS_HEAPTYPE
 _Py_TPFLAGS_HAVE_GC  = 1 << 14  # Py_TPFLAGS_HAVE_GC
 
@@ -307,10 +297,7 @@ try:  # sum() builtin
 except NameError:  # no sum() in Python 2.2
     def _sum(vals):
         '''Partial substitute for missing sum().'''
-        s = 0
-        for v in vals:
-            s += v
-        return s
+        return sum(vals)
 
 
  # private functions
@@ -357,11 +344,8 @@ def _dir2(obj, pref='', excl=(), slots=None, itor=''):
                 for a in getattr(c, slots, ()):
                     if hasattr(obj, a):
                         s.setdefault(a, getattr(obj, a))
-             # assume __slots__ tuple/list
-             # is holding the attr values
             yield slots, _Slots(s)  # _keys(s)
-            for t in _items(s):
-                yield t  # attr name, value
+            yield from _items(s)
     elif itor:  # iterator referents
         for o in obj:  # iter(obj)
             yield itor, o
@@ -414,12 +398,11 @@ def _lengstr(obj):
     '''
     n = leng(obj)
     if n is None:  # no len
-       r = ''
+        return ''
     elif n > _len(obj):  # extended
-       r = ' leng %d!' % n
+        return ' leng %d!' % n
     else:
-       r = ' leng %d' % n
-    return r
+        return ' leng %d' % n
 
 def _nameof(obj, dflt=''):
     '''Return the name of an object.
@@ -455,11 +438,7 @@ def _p100(part, total, prec=1):
 def _plural(num):
     '''Return 's' if plural.
     '''
-    if num == 1:
-        s = ''
-    else:
-        s = 's'
-    return s
+    return '' if num == 1 else 's'
 
 def _power2(n):
     '''Find the next power of 2.
@@ -616,10 +595,7 @@ def _module_refs(obj, named):
     '''Return specific referents of a module object.
     '''
      # ignore this very module
-    if obj.__name__ == __name__:
-        return ()
-     # module is essentially a dict
-    return _dict_refs(obj.__dict__, named)
+    return () if obj.__name__ == __name__ else _dict_refs(obj.__dict__, named)
 
 def _prop_refs(obj, named):
     '''Return specific referents of a property object.
@@ -698,21 +674,14 @@ def _len_dict(obj):
     '''Dict length in items (estimate).
     '''
     n = len(obj)  # active items
-    if n < 6:  # ma_smalltable ...
-       n = 0  # ... in basicsize
-    else:  # at least one unused
-       n = _power2(n + 1)
+    n = 0 if n < 6 else _power2(n + 1)
     return n
 
 def _len_frame(obj):
     '''Length of a frame object.
     '''
     c = getattr(obj, 'f_code', None)
-    if c:
-       n = _len_code(c)
-    else:
-       n = 0
-    return n
+    return _len_code(c) if c else 0
 
 _digit2p2 =  1 << (_sizeof_Cdigit << 3)
 _digitmax = _digit2p2 - 1  # == (2 * PyLong_MASK + 1)
@@ -734,10 +703,7 @@ def _len_iter(obj):
     '''Length (hint) of an iterator.
     '''
     n = getattr(obj, '__length_hint__', None)
-    if n:
-       n = n()
-    else:  # try len()
-       n = _len(obj)
+    n = n() if n else _len(obj)
     return n
 
 def _len_list(obj):
@@ -816,12 +782,11 @@ class _Claskey(object):
     def __str__(self):
         r = str(self._obj)
         if r.endswith('>'):
-            r = '%s%s def>' % (r[:-1], self._sty)
+            return '%s%s def>' % (r[:-1], self._sty)
         elif self._sty is _old_style and not r.startswith('class '):
-            r = 'class %s%s def' % (r, self._sty)
+            return 'class %s%s def' % (r, self._sty)
         else:
-            r = '%s%s def' % (r, self._sty)
-        return r
+            return '%s%s def' % (r, self._sty)
     __repr__ = __str__
 
  # For most objects, the object type is used as the key in the
@@ -979,10 +944,7 @@ class _Typedef(object):
     def dup(self, other=None, **kwds):
         '''Duplicate attributes of dict or other typedef.
         '''
-        if other is None:
-            d = _dict_typedef.kwds()
-        else:
-            d =  other.kwds()
+        d = _dict_typedef.kwds() if other is None else other.kwds()
         d.update(kwds)
         self.reset(**d)
 
@@ -1024,10 +986,7 @@ class _Typedef(object):
         if k and k not in _typedefs:  # instance key
             _typedefs[k] = self
             if c and c not in _typedefs:  # class key
-                if t.__module__ in _builtin_modules:
-                    k = _kind_ignored  # default
-                else:
-                    k = self.kind
+                k = _kind_ignored if t.__module__ in _builtin_modules else self.kind
                 _typedefs[c] = _Typedef(base=_basicsize(type(t), base=base, heap=heap),
                                         refs=_type_refs,
                                         both=False, kind=k, type=t)
@@ -1629,10 +1588,7 @@ class Asizer(object):
             else:
                 s[i] = self._sizer(o, 0, sized)
             t.append(s[i])
-        if sized:
-            s = _sum([i.size for i in _values(s)])  # [] for Python 2.2
-        else:
-            s = _sum(_values(s))
+        s = _sum([i.size for i in _values(s)]) if sized else _sum(_values(s))
         self._total += s  # accumulate
         return s, tuple(t)
 
@@ -1865,10 +1821,7 @@ class Asizer(object):
         if stats is not None:
             self._stats_ = s = int(stats)
             self._cutoff = (stats - s) * 100
-            if s > 1:  # profile types
-                self._profile = True
-            else:
-                self._profile = False
+            self._profile = s > 1
 
     def _get_duplicate(self):
         '''Number of duplicate objects.
@@ -1927,11 +1880,7 @@ class Asizer(object):
         self._limit_  = limit
         self._stats_  = stats
         self._stream  = stream
-        if ignored:
-            self._ign_d = _kind_ignored
-        else:
-            self._ign_d = None
-         # clear state
+        self._ign_d = _kind_ignored if ignored else None
         self._clear()
         self.set(align=align, code=code, stats=stats)
 
@@ -2171,8 +2120,8 @@ def leng(obj, **opts):
     v = _typedefof(obj, **opts)
     if v:
         v = v.leng
-        if v and _callable(v):
-            v = v(obj)
+    if v and _callable(v):
+        v = v(obj)
     return v
 
 def refs(obj, **opts):
@@ -2185,8 +2134,8 @@ def refs(obj, **opts):
     v = _typedefof(obj, **opts)
     if v:
         v = v.refs
-        if v and _callable(v):
-            v = v(obj, False)
+    if v and _callable(v):
+        v = v(obj, False)
     return v
 
 def named_refs(obj):
@@ -2198,12 +2147,12 @@ def named_refs(obj):
     v = _typedefof(obj)
     if v:
         v = v.refs
-        if v and _callable(v):
-            for ref in v(obj, True):
-                try:
-                    refs.append((ref.name, ref.ref))
-                except AttributeError:
-                    pass
+    if v and _callable(v):
+        for ref in v(obj, True):
+            try:
+                refs.append((ref.name, ref.ref))
+            except AttributeError:
+                pass
     return refs
 
 def test_flatsize(failf=None, stdf=None):

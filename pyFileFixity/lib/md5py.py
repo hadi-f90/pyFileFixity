@@ -301,7 +301,8 @@ class MD5:
         are equivalent to a single call with the concatenation of all
         the arguments, i.e. m.update(a); m.update(b) is equivalent
         to m.update(a+b).
-        """
+        """
+
         leninBuf = long(len(inBuf))
 
         # Compute number of bytes mod 64.

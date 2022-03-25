@@ -24,7 +24,7 @@ def get_action():
     if len(sys.argv) <= 1:
         print_usage()
         sys.exit(1)
-    if not sys.argv[1] in all_actions:
+    if sys.argv[1] not in all_actions:
         print("Valid actions are: " + " ".join(all_actions))
         sys.exit(1)
 
@@ -70,14 +70,13 @@ def get_profile_filenames(args):
 
                 if filename not in filenames:
                     filenames.append(filename)
+            elif osp.isfile(arg):
+                if arg not in filenames:
+                    filenames.append(arg)
+            elif osp.isdir(arg):
+                raise ValueError("Path %s is a directory" % arg)
             else:
-                if osp.isfile(arg):
-                    if arg not in filenames:
-                        filenames.append(arg)
-                elif osp.isdir(arg):
-                    raise ValueError("Path %s is a directory" % arg)
-                else:
-                    raise ValueError("File %s not found" % arg)
+                raise ValueError("File %s not found" % arg)
 
     # Add timestamp files, if any
     for filename in reversed(filenames):
@@ -209,11 +208,9 @@ def run_action():
         cmd_line = get_cmd_line(args)
         args[1:1] = ("-m", "memory_profiler", "--timestamp",
                      "-o", mprofile_output)
-        p = subprocess.Popen(args)
     else:
         cmd_line = get_cmd_line(args)
-        p = subprocess.Popen(args)
-
+    p = subprocess.Popen(args)
     with open(mprofile_output, "a") as f:
         f.write("CMDLINE {0}\n".format(cmd_line))
         mp.memory_usage(proc=p, interval=options.interval, timestamps=True,
@@ -283,29 +280,25 @@ def read_mprofile_file(filename):
     mem_usage = []
     timestamp = []
     cmd_line = None
-    f = open(filename, "r")
-    for l in f:
-        field, value = l.split(' ', 1)
-        if field == "MEM":
-            # mem, timestamp
-            values = value.split(' ')
-            mem_usage.append(float(values[0]))
-            timestamp.append(float(values[1]))
+    with open(filename, "r") as f:
+        for l in f:
+            field, value = l.split(' ', 1)
+            if field == "MEM":
+                # mem, timestamp
+                values = value.split(' ')
+                mem_usage.append(float(values[0]))
+                timestamp.append(float(values[1]))
 
-        elif field == "FUNC":
-            values = value.split(' ')
-            f_name, mem_start, start, mem_end, end = values[:5]
-            ts = func_ts.get(f_name, [])
-            ts.append([float(start), float(end),
-                       float(mem_start), float(mem_end)])
-            func_ts[f_name] = ts
+            elif field == "FUNC":
+                values = value.split(' ')
+                f_name, mem_start, start, mem_end, end = values[:5]
+                ts = func_ts.get(f_name, [])
+                ts.append([float(start), float(end),
+                           float(mem_start), float(mem_end)])
+                func_ts[f_name] = ts
 
-        elif field == "CMDLINE":
-            cmd_line = value
-        else:
-            pass
-    f.close()
-
+            elif field == "CMDLINE":
+                cmd_line = value
     return {"mem_usage": mem_usage, "timestamp": timestamp,
             "func_timestamp": func_ts, 'filename': filename,
             'cmd_line': cmd_line}
@@ -353,7 +346,6 @@ def plot_file(filename, index=0, timestamps=True):
     max_mem = mem.max()
     max_mem_ind = mem.argmax()
 
-    all_colors=("c", "y", "g", "r", "b")
     mem_line_colors=('k', "b", "r")
     mem_line_label = time.strftime("%d / %m / %Y - start at %H:%M:%S",
                                    time.localtime(global_start)) \
@@ -368,15 +360,13 @@ def plot_file(filename, index=0, timestamps=True):
 
     # plot timestamps, if any
     if len(ts) > 0 and timestamps:
-        func_num = 0
-        for f, exec_ts in ts.items():
+        all_colors=("c", "y", "g", "r", "b")
+        for func_num, (f, exec_ts) in enumerate(ts.items()):
             for execution in exec_ts:
                 add_brackets(execution[:2], execution[2:], xshift=global_start,
                              color= all_colors[func_num % len(all_colors)],
                              label=f.split(".")[-1]
                              + " %.3fs" % (execution[1] - execution[0]))
-            func_num += 1
-
     if timestamps:
         pl.hlines(max_mem,
                   pl.xlim()[0] + 0.001, pl.xlim()[1] - 0.001,
@@ -417,21 +407,18 @@ def plot_action():
         filenames = []
         for arg in args:
             if osp.exists(arg):
-                if not arg in filenames:
+                if arg not in filenames:
                     filenames.append(arg)
             else:
                 try:
                     n = int(arg)
                 except ValueError:
                     print("Input file not found: " + arg)
-                if not profiles[n] in filenames:
+                if profiles[n] not in filenames:
                     filenames.append(profiles[n])
 
     pl.figure(figsize=(14, 6), dpi=90)
-    if len(filenames) > 1 or options.no_timestamps:
-        timestamps = False
-    else:
-        timestamps = True
+    timestamps = len(filenames) <= 1 and not options.no_timestamps
     for n, filename in enumerate(filenames):
         mprofile = plot_file(filename, index=n, timestamps=timestamps)
     pl.xlabel("time (in seconds)")
@@ -439,9 +426,8 @@ def plot_action():
 
     if options.title is None and len(filenames) == 1:
         pl.title(mprofile['cmd_line'])
-    else:
-        if options.title is not None:
-            pl.title(options.title)
+    elif options.title is not None:
+        pl.title(options.title)
 
     ax = pl.gca()
     # place legend within the plot, make partially transparent in

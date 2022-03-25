@@ -47,11 +47,10 @@ def recurse( record, index, stop_types=STOP_TYPES,already_seen=None, type_group=
         if 'refs' in record:
             for child in children( record, index, stop_types=stop_types ):
                 if child['address'] not in already_seen:
-                    for descendant in recurse( 
+                    yield from recurse( 
                         child, index, stop_types, 
                         already_seen=already_seen, type_group=type_group,
-                    ):
-                        yield descendant
+                    )
         yield record 
 
 def find_loops( record, index, stop_types = STOP_TYPES, open=None, seen = None ):
@@ -71,12 +70,14 @@ def find_loops( record, index, stop_types = STOP_TYPES, open=None, seen = None )
                 seen.add(new)
                 yield new
         elif child['address'] in seen:
-            continue 
+            continue
         else:
             seen.add( child['address'])
             open.append( child['address'] )
-            for loop in find_loops( child, index, stop_types=stop_types, open=open, seen=seen ):
-                yield loop 
+            yield from find_loops(
+                child, index, stop_types=stop_types, open=open, seen=seen
+            )
+
             open.pop( -1 )
 
 def promote_loops( loops, index, shared ):
@@ -84,10 +85,14 @@ def promote_loops( loops, index, shared ):
     for loop in loops:
         loop = list(loop)
         members = [index[addr] for addr in loop]
-        external_parents = list(set([
-            addr for addr in sum([shared.get(addr,[]) for addr in loop],[])
-            if addr not in loop 
-        ]))
+        external_parents = list(
+            {
+                addr
+                for addr in sum((shared.get(addr, []) for addr in loop), [])
+                if addr not in loop
+            }
+        )
+
         if external_parents:
             if len(external_parents) == 1:
                 # potentially a loop that's been looped...
@@ -155,8 +160,8 @@ def recurse_module( overall_record, index, shared, stop_types=STOP_TYPES, alread
     ):
         # anything with a totsize we've already processed...
         if record.get('totsize') is not None:
-            continue 
-        rinfo = record 
+            continue
+        rinfo = record
         rinfo['module'] = overall_record.get('name',NON_MODULE_REFS )
         if not record['refs']:
             rinfo['rsize'] = 0
@@ -164,21 +169,21 @@ def recurse_module( overall_record, index, shared, stop_types=STOP_TYPES, alread
         else:
             # TODO: provide a flag to coalesce based on e.g. type at each level or throughout...
             rinfo['children'] = rinfo_children = list ( children( record, index, stop_types=stop_types ) )
-            rinfo['rsize'] = sum([
+            rinfo['rsize'] = sum(
                 (
-                    child.get('totsize',0.0)/float(len(shared.get( child['address'], [])) or 1)
-                )
-                for child in rinfo_children
-            ], 0.0 )
+                    child.get('totsize', 0.0)
+                    / float(len(shared.get(child['address'], [])) or 1)
+                    for child in rinfo_children
+                ),
+                0.0,
+            )
+
         rinfo['totsize'] = record['size'] + rinfo['rsize']
-    
+
     return None
     
 def as_id( x ):
-    if isinstance( x, dict ):
-        return x['address']
-    else:
-        return x
+    return x['address'] if isinstance( x, dict ) else x
 
 def rewrite_refs( targets, old,new, index, key='refs', single_ref=False ):
     """Rewrite key in all targets (from index if necessary) to replace old with new"""
@@ -296,24 +301,27 @@ def simplify_dicts( index, shared, simplify_dicts=SIMPLIFY_DICTS, always_compres
     """
     
     # things which will have their dictionaries compressed out
-    
+
     to_delete = set()
-    
+
     for to_simplify in iterindex(index):
         if to_simplify['address'] in to_delete:
-            continue 
-        if to_simplify['type'] in simplify_dicts and not 'compressed' in to_simplify:
+            continue
+        if (
+            to_simplify['type'] in simplify_dicts
+            and 'compressed' not in to_simplify
+        ):
             refs = to_simplify['refs']
             for ref in refs:
                 child = index.get( ref )
                 if child is not None and child['type'] == 'dict':
                     child_referrers = child['parents'][:]
                     if len(child_referrers) == 1 or to_simplify['type'] in always_compress:
-                        
+
                         to_simplify['compressed'] = True
                         to_simplify['refs'] = child['refs']
                         to_simplify['size'] += child['size']
-                        
+
                         # rewrite anything *else* that was pointing to child to point to us...
                         while to_simplify['address'] in child_referrers:
                             child_referrers.remove( to_simplify['address'] )
@@ -324,7 +332,7 @@ def simplify_dicts( index, shared, simplify_dicts=SIMPLIFY_DICTS, always_compres
                                 to_simplify['address'], 
                                 index, single_ref=True
                             )
-                        
+
                         # now rewrite grandchildren to point to root obj instead of dict
                         for grandchild in child['refs']:
                             grandchild = index[grandchild]
@@ -341,7 +349,7 @@ def simplify_dicts( index, shared, simplify_dicts=SIMPLIFY_DICTS, always_compres
     for item in to_delete:
         del index[item]
         del shared[item]
-    
+
     return index
 
 def find_reachable( modules, index, shared, stop_types=STOP_TYPES ):
@@ -376,10 +384,7 @@ class _syntheticaddress( object ):
 new_address = _syntheticaddress()
 
 def index_size( index ):
-    return sum([
-        v.get('size',0)
-        for v in iterindex( index )
-    ],0)
+    return sum((v.get('size',0) for v in iterindex( index )), 0)
 
 def iterindex( index ):
     for (k,v) in index.iteritems():
@@ -403,9 +408,9 @@ def check_parents( index, reachable ):
 def load( filename, include_interpreter=False ):
     index = {
     } # address: structure
-    shared = dict() # address: [parent addresses,...]
+    shared = {}
     modules = set()
-    
+
     root_address = new_address( index )
     root = {
         'type':'dump',
@@ -419,16 +424,16 @@ def load( filename, include_interpreter=False ):
     index[root_address] = root
     index_ref = Ref( index )
     root_ref = Ref( root )
-    
-    root['root'] = root_ref 
+
+    root['root'] = root_ref
     root['index'] = index_ref
-    
+
     raw_total = 0
-    
+
     for line in open( filename ):
         struct = json_loads( line.strip())
         index[struct['address']] = struct 
-        
+
         struct['root'] = root_ref
         struct['index'] = index_ref
 
@@ -441,14 +446,13 @@ def load( filename, include_interpreter=False ):
         raw_total += struct['size']
         if struct['type'] == 'module':
             modules.add( struct['address'] )
-    
+
     modules = [index[addr] for addr in modules]
-    
+
     reachable = find_reachable( modules, index, shared )
     deparent_unreachable( reachable, shared )
-    
+
     bind_parents( index, shared )
-    
 #    unreachable = sum([
 #        v.get( 'size' )
 #        for v in iterindex( index )
@@ -467,7 +471,7 @@ def load( filename, include_interpreter=False ):
         recurse_module(
             m, index, shared
         )
-        
+
     modules.sort( key = lambda m: m.get('totsize',0))
     for module in modules:
         module['parents'].append( root_address )
@@ -486,15 +490,15 @@ def load( filename, include_interpreter=False ):
             pseudo_module.setdefault('parents',[]).append( root_address )
             modules.append( pseudo_module )
     else:
-        to_delete = []
-        for v in iterindex(index):
-            if v.get('totsize') is None:
-                to_delete.append( v['address'] )
+        to_delete = [
+            v['address'] for v in iterindex(index) if v.get('totsize') is None
+        ]
+
         for k in to_delete:
             del index[k]
 
-    all_modules = sum([x.get('totsize',0) for x in modules],0)
- 
+    all_modules = sum((x.get('totsize',0) for x in modules), 0)
+
     root['totsize'] = all_modules
     root['rsize'] = all_modules
     root['size'] = 0
@@ -503,7 +507,7 @@ def load( filename, include_interpreter=False ):
     for item in iterindex( index ):
         item['root'] = root_ref
         item['index'] = index_ref
-    
+
     return root, index
 
 def find_roots( disconnected, index, shared ):
@@ -524,11 +528,12 @@ def find_roots( disconnected, index, shared ):
         'type': 'module',
         'name': '<disconnected objects>',
         'children': rest,
-        'parents': [ ],
+        'parents': [],
         'size': 0,
-        'totsize': sum([x['size'] for x in rest],0),
-        'address': new_address( index ),
+        'totsize': sum((x['size'] for x in rest), 0),
+        'address': new_address(index),
     }
+
     index[un_found['address']] = un_found
     yield un_found
 

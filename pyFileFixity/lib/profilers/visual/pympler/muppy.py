@@ -111,7 +111,7 @@ def sort(objects):
     objects = sorted(objects, key=_getsizeof)
     return objects
 
-def filter(objects, Type=None, min=-1, max=-1): #PYCHOK muppy filter
+def filter(objects, Type=None, min=-1, max=-1):    #PYCHOK muppy filter
     """Filter objects.
 
     The filter can be by type, minimum size, and/or maximum size.
@@ -122,11 +122,10 @@ def filter(objects, Type=None, min=-1, max=-1): #PYCHOK muppy filter
     max -- maximum object size
 
     """
-    res = []
     if min > max:
         raise ValueError("minimum must be smaller than maximum")
-    if Type is not None:
-        res = [o for o in objects if isinstance(o, Type)]
+    res = [o for o in objects if isinstance(o, Type)] if Type is not None else []
+
     if min > -1:
         res = [o for o in res if _getsizeof(o) < min]
     if max > -1:
@@ -234,10 +233,7 @@ def _get_usage(function, *args):
 
 def _is_containerobject(o):
     """Is the passed object a container object."""
-    if type(o).__flags__ & __TPFLAGS_HAVE_GC == 0:
-        return False
-    else:
-        return True
+    return type(o).__flags__ & __TPFLAGS_HAVE_GC != 0
 
 def _remove_duplicates(objects):
     """Remove duplicate objects.

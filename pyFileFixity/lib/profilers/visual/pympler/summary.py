@@ -128,10 +128,7 @@ def summarize(objects):
         else:
             count[otype] = 1
             total_size[otype] = _getsizeof(o)
-    rows = []
-    for otype in count:
-        rows.append([otype, count[otype], total_size[otype]])
-    return rows
+    return [[otype, value, total_size[otype]] for otype, value in count.items()]
 
 def get_diff(left, right):
     """Get the difference of two summaries.
@@ -156,10 +153,7 @@ def get_diff(left, right):
             res.append(row_r)
 
     for row_l in left:
-        found = False
-        for row_r in right:
-            if row_l[0] == row_r[0]:
-                found = True
+        found = any(row_l[0] == row_r[0] for row_r in right)
         if not found:
             res.append([row_l[0], -row_l[1], -row_l[2]])
     return res
@@ -172,9 +166,7 @@ def print_(rows, limit=15, sort='size', order='descending'):
     sort  -- sort elements by 'size', 'type', or '#'
     order -- sort 'ascending' or 'descending'
     """
-    localrows = []
-    for row in rows:
-        localrows.append(list(row))
+    localrows = [list(row) for row in rows]
     # input validation
     sortby = ['type', '#', 'size']
     if sort not in sortby:
@@ -188,13 +180,12 @@ def print_(rows, limit=15, sort='size', order='descending'):
             localrows.sort(key=lambda x: _repr(x[0]))
         elif order == "descending":
             localrows.sort(key=lambda x: _repr(x[0]), reverse=True)
-    else:
-        if order == "ascending":
-            localrows.sort(key=lambda x: x[sortby.index(sort)])
-        elif order == "descending":
-            localrows.sort(key=lambda x: x[sortby.index(sort)], reverse=True)
+    elif order == "ascending":
+        localrows.sort(key=lambda x: x[sortby.index(sort)])
+    elif order == "descending":
+        localrows.sort(key=lambda x: x[sortby.index(sort)], reverse=True)
     # limit rows
-    localrows = localrows[0:limit]
+    localrows = localrows[:limit]
     for row in localrows:
         row[2] = stringutils.pp(row[2])
     # print rows
@@ -223,7 +214,7 @@ def _print_table(rows, header=True):
     # calculate column widths (longest item in each col
     # plus "padding" nr of spaces on both sides)
     cols = zip(*rows)
-    colWidths = [max([len(str(item))+2*padding for item in col]) for col in cols]
+    colWidths = [max(len(str(item))+2*padding for item in col) for col in cols]
     borderline = vdelim.join([w*border for w in colWidths])
     for row in rows:
         print(vdelim.join([justify(str(item),width) for (item,width) in zip(row,colWidths)]))

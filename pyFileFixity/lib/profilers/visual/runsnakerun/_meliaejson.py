@@ -6,6 +6,7 @@ json + C speedups.  This is *not* however, a full json decoder, it is
 *just* a parser for the flat records meliae produces (i.e. no recursive 
 structures, no floats, just ints, strings and lists-of-ints)
 """
+
 import re, unittest, json
 
 whitespace = r'[ \t]'
@@ -13,7 +14,7 @@ whitespace = r'[ \t]'
 escape = r"""(?:\\[uU][0-9a-fA-F]{4})"""
 string = r"""(?:["](?P<%(key)s>([^"\\]|(\\")|%(escape)s|\\[^uU"])*?)["])"""
 key = string%{'key':'key','escape':escape}
-string = string%{'key':'string','escape':escape}
+string %= {'key':'string','escape':escape}
 integer = r"""(?P<int>[+-]*\d+)"""
 listcontent = r"""([+-]*\d+[,]?%(whitespace)s*?)*"""%globals()
 intlist = r"""\[%(whitespace)s*(?P<list>%(listcontent)s)%(whitespace)s*\]"""%globals()

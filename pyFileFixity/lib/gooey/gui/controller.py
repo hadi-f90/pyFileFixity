@@ -103,7 +103,7 @@ class Controller(object):
     required_section = self.core_gui.GetRequiredArgs()
     if len(required_section) == 0:
       return True  # no requirements!
-    return not any(req == '' for req in required_section)
+    return all(req != '' for req in required_section)
 
   def success_dialog(self):
     self.show_dialog(i18n._("execution_finished"), i18n._('success_message'), wx.ICON_INFORMATION)

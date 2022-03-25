@@ -100,7 +100,7 @@ def find_prime_polynomials(generator=2, c_exp=8, fast_primes=False, single=False
 
         # Second loop, build the whole Galois Field
         x = GF2int(1)
-        for i in _range(field_charac):
+        for _ in _range(field_charac):
             # Compute the next value in the field (ie, the next power of alpha/generator)
             x = x.multiply(generator, prim, field_charac+1)
 
@@ -259,7 +259,7 @@ class GF2int(int):
                 # If yes, then...
                 c.append(i) # append this power (i, the exponent, gives us the coefficient)
                 x ^= b # and compute the remainder of x / b
-            i = i+1 # increment to compute the next power of 2
+            i += 1
         return " + ".join(["x^%i" % y for y in c[::-1]]) # print a nice binary polynomial
 
     def multiply(a, b, prim=0x11b, field_charac_full=256, carryless=True):
@@ -280,9 +280,10 @@ class GF2int(int):
         b = int(b)
         while b: # while b is not 0
             if b & 1: r = r ^ a if carryless else r + a # b is odd, then add the corresponding a to r (the sum of all a's corresponding to odd b's will give the final product). Note that since we're in GF(2), the addition is in fact an XOR (very important because in GF(2) the multiplication and additions are carry-less, thus it changes the result!).
-            b = b >> 1 # equivalent to b // 2
-            a = a << 1 # equivalent to a*2
-            if prim > 0 and a & field_charac_full: a = a ^ prim # GF modulo: if a >= 256 then apply modular reduction using the primitive polynomial (we just substract, but since the primitive number can be above 256 then we directly XOR).
+            b >>= 1
+            a <<= 1
+            if prim > 0 and a & field_charac_full:
+                a ^= prim
 
         return GF2int(r)
 

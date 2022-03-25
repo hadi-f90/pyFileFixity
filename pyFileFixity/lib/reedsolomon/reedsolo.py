@@ -157,7 +157,7 @@ def find_prime_polys(generator=2, c_exp=8, fast_primes=False, single=False):
 
         # Second loop, build the whole Galois Field
         x = 1
-        for i in xrange(field_charac):
+        for _ in xrange(field_charac):
             # Compute the next value in the field (ie, the next power of alpha/generator)
             x = gf_mult_noLUT(x, generator, prim, field_charac+1)
 
@@ -410,10 +410,8 @@ def rs_simple_encode_msg(msg_in, nsym, fcr=0, generator=2, gen=None):
 
     # Pad the message, then divide it by the irreducible generator polynomial
     _, remainder = gf_poly_div(msg_in + bytearray(len(gen)-1), gen)
-    # The remainder is our RS code! Just append it to our original message to get our full codeword (this represents a polynomial of max 256 terms)
-    msg_out = msg_in + remainder
     # Return the codeword
-    return msg_out
+    return msg_in + remainder
 
 def rs_encode_msg(msg_in, nsym, fcr=0, generator=2, gen=None):
     '''Reed-Solomon main encoding function, using polynomial division (Extended Synthetic Division, the fastest algorithm available to my knowledge), better explained at http://research.swtch.com/field'''
@@ -454,7 +452,7 @@ def rs_calc_syndromes(msg, nsym, fcr=0, generator=2):
     # This is not necessary as anyway syndromes are defined such as there are only non-zero coefficients (the only 0 is the shift of the constant here) and subsequent computations will/must account for the shift by skipping the first iteration (eg, the often seen range(1, n-k+1)), but you can also avoid prepending the 0 coeff and adapt every subsequent computations to start from 0 instead of 1.
     return [0] + [gf_poly_eval(msg, gf_pow(generator, i+fcr)) for i in xrange(nsym)]
 
-def rs_correct_errata(msg_in, synd, err_pos, fcr=0, generator=2): # err_pos is a list of the positions of the errors/erasures/errata
+def rs_correct_errata(msg_in, synd, err_pos, fcr=0, generator=2):    # err_pos is a list of the positions of the errors/erasures/errata
     '''Forney algorithm, computes the values (error magnitude) to correct the input message.'''
     global field_charac
     msg = bytearray(msg_in)
@@ -479,10 +477,10 @@ def rs_correct_errata(msg_in, synd, err_pos, fcr=0, generator=2): # err_pos is a
 
         # Compute the formal derivative of the error locator polynomial (see Blahut, Algebraic codes for data transmission, pp 196-197).
         # the formal derivative of the errata locator is used as the denominator of the Forney Algorithm, which simply says that the ith error value is given by error_evaluator(gf_inverse(Xi)) / error_locator_derivative(gf_inverse(Xi)). See Blahut, Algebraic codes for data transmission, pp 196-197.
-        err_loc_prime_tmp = []
-        for j in xrange(Xlength):
-            if j != i:
-                err_loc_prime_tmp.append( gf_sub(1, gf_mul(Xi_inv, X[j])) )
+        err_loc_prime_tmp = [
+            gf_sub(1, gf_mul(Xi_inv, X[j])) for j in xrange(Xlength) if j != i
+        ]
+
         # compute the product, which is the denominator of the Forney algorithm (errata locator derivative)
         err_loc_prime = 1
         for coef in err_loc_prime_tmp:
@@ -494,7 +492,7 @@ def rs_correct_errata(msg_in, synd, err_pos, fcr=0, generator=2): # err_pos is a
         # Thus here this method works with erasures too because firstly we fixed the equation to be like the theoretical one (don't know why it was modified in _old_forney(), if it's an optimization, it doesn't enhance anything), and secondly because we removed the product bound on s, which prevented computing errors and erasures above the s=(n-k)//2 bound.
         y = gf_poly_eval(err_eval[::-1], Xi_inv) # numerator of the Forney algorithm (errata evaluator evaluated)
         y = gf_mul(gf_pow(Xi, 1-fcr), y) # adjust to fcr parameter
-        
+
         # Compute the magnitude
         magnitude = gf_div(y, err_loc_prime) # magnitude value of the error, calculated by the Forney algorithm (an equation in fact): dividing the errata evaluator with the errata locator derivative gives us the errata magnitude (ie, value to repair) the ith symbol
         E[err_pos[i]] = magnitude # store the magnitude for this error into the magnitude polynomial
@@ -517,19 +515,10 @@ def rs_find_error_locator(synd, nsym, erase_loc=None, erase_count=0):
     else:
         err_loc = bytearray([1]) # This is the main variable we want to fill, also called Sigma in other notations or more formally the errors/errata locator polynomial.
         old_loc = bytearray([1]) # BM is an iterative algorithm, and we need the errata locator polynomial of the previous iteration in order to update other necessary variables.
-    #L = 0 # update flag variable, not needed here because we use an alternative equivalent way of checking if update is needed (but using the flag could potentially be faster depending on if using length(list) is taking linear time in your language, here in Python it's constant so it's as fast.
-
-    # Fix the syndrome shifting: when computing the syndrome, some implementations may prepend a 0 coefficient for the lowest degree term (the constant). This is a case of syndrome shifting, thus the syndrome will be bigger than the number of ecc symbols (I don't know what purpose serves this shifting). If that's the case, then we need to account for the syndrome shifting when we use the syndrome such as inside BM, by skipping those prepended coefficients.
-    # Another way to detect the shifting is to detect the 0 coefficients: by definition, a syndrome does not contain any 0 coefficient (except if there are no errors/erasures, in this case they are all 0). This however doesn't work with the modified Forney syndrome, which set to 0 the coefficients corresponding to erasures, leaving only the coefficients corresponding to errors.
-    synd_shift = 0
-    if len(synd) > nsym: synd_shift = len(synd) - nsym
+    synd_shift = len(synd) - nsym if len(synd) > nsym else 0
 
     for i in xrange(nsym-erase_count): # generally: nsym-erase_count == len(synd), except when you input a partial erase_loc and using the full syndrome instead of the Forney syndrome, in which case nsym-erase_count is more correct (len(synd) will fail badly with IndexError).
-        if erase_loc: # if an erasures locator polynomial was provided to init the errors locator polynomial, then we must skip the FIRST erase_count iterations (not the last iterations, this is very important!)
-            K = erase_count+i+synd_shift
-        else: # if erasures locator is not provided, then either there's no erasures to account or we use the Forney syndromes, so we don't need to use erase_count nor erase_loc (the erasures have been trimmed out of the Forney syndromes).
-            K = i+synd_shift
-
+        K = erase_count+i+synd_shift if erase_loc else i+synd_shift
         # Compute the discrepancy Delta
         # Here is the close-to-the-books operation to compute the discrepancy Delta: it's a simple polynomial multiplication of error locator with the syndromes, and then we get the Kth element.
         #delta = gf_poly_mul(err_loc[::-1], synd)[K] # theoretically it should be gf_poly_add(synd[::-1], [1])[::-1] instead of just synd, but it seems it's not absolutely necessary to correctly decode.
@@ -589,10 +578,12 @@ def rs_find_errors(err_loc, nmess, generator=2):
     '''Find the roots (ie, where evaluation = zero) of error polynomial by bruteforce trial, this is a sort of Chien's search (but less efficient, Chien's search is a way to evaluate the polynomial such that each evaluation only takes constant time).'''
     # nmess = length of whole codeword (message + ecc symbols)
     errs = len(err_loc) - 1
-    err_pos = []
-    for i in xrange(nmess): # normally we should try all 2^8 possible values, but here we optimize to just check the interesting symbols
-        if gf_poly_eval(err_loc, gf_pow(generator, i)) == 0: # It's a 0? Bingo, it's a root of the error locator polynomial, in other terms this is the location of an error
-            err_pos.append(nmess - 1 - i)
+    err_pos = [
+        nmess - 1 - i
+        for i in xrange(nmess)
+        if gf_poly_eval(err_loc, gf_pow(generator, i)) == 0
+    ]
+
     # Sanity check: the number of errors/errata positions found should be exactly the same as the length of the errata locator polynomial
     if len(err_pos) != errs:
         # TODO: to decode messages+ecc with length n > 255, we may try to use a bruteforce approach: the correct positions ARE in the final array j, but the problem is because we are above the Galois Field's range, there is a wraparound so that for example if j should be [0, 1, 2, 3], we will also get [255, 256, 257, 258] (because 258 % 255 == 3, same for the other values), so we can't discriminate. The issue is that fixing any errs_nb errors among those will always give a correct output message (in the sense that the syndrome will be all 0), so we may not even be able to check if that's correct or not, so I'm not sure the bruteforce approach may even be possible.

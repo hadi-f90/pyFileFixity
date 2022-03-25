@@ -68,8 +68,8 @@ def detect_reedsolomon_parameters(message, mesecc_orig, gen_list=[2, 3, 5], c_ex
     n = len(mesecc_orig)
     k = len(message)
     field_charac = int((2**c_exp) - 1)
-    maxval1 = max([ord(x) if isinstance(x, basestring) else x for x in message ])
-    maxval2 = max([ord(x) if isinstance(x, basestring) else x for x in mesecc_orig])
+    maxval1 = max(ord(x) if isinstance(x, basestring) else x for x in message)
+    maxval2 = max(ord(x) if isinstance(x, basestring) else x for x in mesecc_orig)
     maxval = max([maxval1, maxval2])
     if (maxval > field_charac):
         raise ValueError("The specified field's exponent is wrong, the message contains values (%i) above the field's cardinality (%i)!" % (maxval, field_charac))
@@ -100,16 +100,14 @@ def detect_reedsolomon_parameters(message, mesecc_orig, gen_list=[2, 3, 5], c_ex
                     # If Hamming distance is 0, then we have found a perfect match (the current set of parameters allow to generate the exact same RS code from the sample message), so we stop here
                     if h == 0: break
 
-    # Printing the results to the user
-    if best_match["hscore"] >= 0 and best_match["hscore"] < len(mesecc_orig):
-        perfect_match_str = " (0=perfect match)" if best_match["hscore"]==0 else ""
-        result = ''
-        result += "Found closest set of parameters, with Hamming distance %i%s:\n" % (best_match["hscore"], perfect_match_str)
-        for param in best_match["params"]:
-            result += "gen_nb=%s prim=%s(%s) fcr=%s\n" % (param["gen_nb"], param["prim"], hex(param["prim"]), param["fcr"])
-        return result
-    else:
+    if best_match["hscore"] < 0 or best_match["hscore"] >= len(mesecc_orig):
         return "Parameters could not be automatically detected..."
+    perfect_match_str = " (0=perfect match)" if best_match["hscore"]==0 else ""
+    result = ''
+    result += "Found closest set of parameters, with Hamming distance %i%s:\n" % (best_match["hscore"], perfect_match_str)
+    for param in best_match["params"]:
+        result += "gen_nb=%s prim=%s(%s) fcr=%s\n" % (param["gen_nb"], param["prim"], hex(param["prim"]), param["fcr"])
+    return result
 
 
 ### Main ECCMan Class to manage ECC codecs ###
@@ -122,7 +120,7 @@ class ECCMan(object):
         self.c_exp = 8 # we stay in GF(2^8) for this software
         self.field_charac = int((2**self.c_exp) - 1)
 
-        if algo == 1 or algo == 2: # brownanrs library implementations: fully correct base 3 implementation, and mode 2 is for fast encoding
+        if algo in [1, 2]: # brownanrs library implementations: fully correct base 3 implementation, and mode 2 is for fast encoding
             self.gen_nb = 3
             self.prim = 0x11b
             self.fcr = 1
@@ -158,12 +156,11 @@ class ECCMan(object):
             mesecc = self.ecc_manager.encode(message, k=k)
         elif self.algo == 2:
             mesecc = self.ecc_manager.encode_fast(message, k=k)
-        elif self.algo == 3 or self.algo == 4:
+        elif self.algo in [3, 4]:
             mesecc = rs_encode_msg(message, self.n-k, fcr=self.fcr, gen=self.g[self.n-k])
             #mesecc = rs_encode_msg_precomp(message, self.n-k, fcr=self.fcr, gen=self.g[self.n-k])
 
-        ecc = mesecc[len(message):]
-        return ecc
+        return mesecc[len(message):]
 
     def decode(self, message, ecc, k=None, enable_erasures=False, erasures_char="\x00", only_erasures=False):
         '''Repair a message and its ecc also, given the message and its ecc (both can be corrupted, we will still try to fix both of them)'''
@@ -241,9 +238,9 @@ class ECCMan(object):
         if not k: k = self.k
         message, _ = self.pad(message, k=k)
         ecc, _ = self.rpad(ecc, k=k)
-        if self.algo == 1 or self.algo == 2:
+        if self.algo in [1, 2]:
             return self.ecc_manager.check_fast(message + ecc, k=k)
-        elif self.algo == 3 or self.algo == 4:
+        elif self.algo in [3, 4]:
             return reedsolo.rs_check(bytearray(message + ecc), self.n-k, fcr=self.fcr, generator=self.gen_nb)
 
     def description(self):

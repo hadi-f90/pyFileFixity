@@ -195,8 +195,7 @@ class SortedSet(MutableSet, Sequence):
         *iterables*.
         """
         diff = self._set.difference(*iterables)
-        new_set = self.__class__(key=self._key, load=self._load, _set=diff)
-        return new_set
+        return self.__class__(key=self._key, load=self._load, _set=diff)
 
     __sub__ = difference
     __rsub__ = __sub__
@@ -224,8 +223,7 @@ class SortedSet(MutableSet, Sequence):
         Return a new set with elements common to the set and all *iterables*.
         """
         comb = self._set.intersection(*iterables)
-        new_set = self.__class__(key=self._key, load=self._load, _set=comb)
-        return new_set
+        return self.__class__(key=self._key, load=self._load, _set=comb)
 
     __and__ = intersection
     __rand__ = __and__
@@ -246,8 +244,7 @@ class SortedSet(MutableSet, Sequence):
         Return a new set with elements in either *self* or *that* but not both.
         """
         diff = self._set.symmetric_difference(that)
-        new_set = self.__class__(key=self._key, load=self._load, _set=diff)
-        return new_set
+        return self.__class__(key=self._key, load=self._load, _set=diff)
 
     __xor__ = symmetric_difference
     __rxor__ = __xor__

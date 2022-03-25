@@ -17,14 +17,10 @@ class ClientApp(object):
     self.payload = payload
 
   def HasPositionals(self):
-    if self.action_groups._positionals:
-      return True
-    return False
+    return bool(self.action_groups._positionals)
 
   def IsValidArgString(self, arg_string):
-    if isinstance(self._Parse(arg_string), str):
-      return False
-    return True
+    return not isinstance(self._Parse(arg_string), str)
 
   def _Parse(self, arg_string):
     try:
@@ -58,6 +54,5 @@ class EmptyClientApp(object):
     self.payload = payload
 
 
-if __name__ == '__main__':
-  pass
+pass
 

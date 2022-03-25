@@ -130,6 +130,4 @@ class ProfileBrowser(cmd.Cmd):
         print >> self.stream, "Strip leading path information from filenames in the report."
 
     def postcmd(self, stop, line):
-        if stop:
-            return stop
-        return None
+        return stop or None

@@ -322,10 +322,9 @@ class SortedDict(dict):
         """
         if key in self:
             return self[key]
-        else:
-            self._setitem(key, default)
-            self._list_add(key)
-            return default
+        self._setitem(key, default)
+        self._list_add(key)
+        return default
 
     def update(self, *args, **kwargs):
         """
@@ -503,7 +502,7 @@ class KeysView(AbstractKeysView, Set, Sequence):
     if hexversion < 0x03000000:
         def isdisjoint(self, that):
             """Return True if and only if *that* is disjoint with self."""
-            return not any(key in self._list for key in that)
+            return all(key not in self._list for key in that)
     else:
         def isdisjoint(self, that):
             """Return True if and only if *that* is disjoint with self."""
@@ -587,16 +586,15 @@ class ValuesView(AbstractValuesView, Sequence):
         for idx, val in enumerate(self):
             if value == val:
                 return idx
-        else:
-            raise ValueError('{0} is not in dict'.format(repr(value)))
+        raise ValueError('{0} is not in dict'.format(repr(value)))
     if hexversion < 0x03000000:
         def count(self, value):
             """Return the number of occurrences of *value* in self."""
-            return sum(1 for val in self._dict.itervalues() if val == value)
+            return sum(val == value for val in self._dict.itervalues())
     else:
         def count(self, value):
             """Return the number of occurrences of *value* in self."""
-            return sum(1 for val in self._dict.values() if val == value)
+            return sum(val == value for val in self._dict.values())
     def __lt__(self, that):
         raise TypeError
     def __gt__(self, that):
@@ -669,9 +667,8 @@ class ItemsView(AbstractItemsView, Set, Sequence):
         _dict, _list = self._dict, self._list
         if isinstance(index, slice):
             return [(key, _dict[key]) for key in _list[index]]
-        else:
-            key = _list[index]
-            return (key, _dict[key])
+        key = _list[index]
+        return (key, _dict[key])
     def __reversed__(self):
         """
         Return a reversed iterable over the items in the dictionary. Items are
@@ -733,10 +730,7 @@ class ItemsView(AbstractItemsView, Set, Sequence):
         def isdisjoint(self, that):
             """Return True if and only if *that* is disjoint with self."""
             _dict = self._dict
-            for key, value in that:
-                if key in _dict and _dict[key] == value:
-                    return False
-            return True
+            return not any(key in _dict and _dict[key] == value for key, value in that)
     else:
         def isdisjoint(self, that):
             """Return True if and only if *that* is disjoint with self."""

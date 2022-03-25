@@ -23,6 +23,5 @@ def load(module_source):
     os.close(descriptor)
     os.remove(tmpfilepath)
 
-if __name__ == '__main__':
-  pass
+pass
 

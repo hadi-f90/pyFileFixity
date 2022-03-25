@@ -109,13 +109,12 @@ class SortedListWithKey(MutableSequence):
             _lists.insert(pos + 1, half_list)
 
             del _index[:]
-        else:
-            if len(_index) > 0:
-                child = self._offset + pos
-                while child > 0:
-                    _index[child] += 1
-                    child = (child - 1) >> 1
-                _index[0] += 1
+        elif len(_index) > 0:
+            child = self._offset + pos
+            while child > 0:
+                _index[child] += 1
+                child = (child - 1) >> 1
+            _index[0] += 1
 
     def update(self, iterable):
         """Update the list by adding all elements from *iterable*."""
@@ -665,7 +664,7 @@ class SortedListWithKey(MutableSequence):
             # be the desired behavior.
 
             indices = range(start, stop, step)
-            return list(self[index] for index in indices)
+            return [self[index] for index in indices]
         else:
             pos, idx = self._pos(idx)
             return _lists[pos][idx]
@@ -787,19 +786,13 @@ class SortedListWithKey(MutableSequence):
 
                 # Check ordering in context of sorted list.
 
-                if not start or not len(value):
-                    # Nothing to check on the lhs.
-                    pass
-                else:
+                if start and len(value):
                     pos, loc = _pos(start - 1)
                     if _keys[pos][loc] > keys[0]:
                         msg = '{0} not in sort order at index {1}'.format(repr(value[0]), start)
                         raise ValueError(msg)
 
-                if stop == len(self) or not len(value):
-                    # Nothing to check on the rhs.
-                    pass
-                else:
+                if stop != len(self) and len(value):
                     # "stop" is exclusive so we don't need
                     # to add one for the index.
                     pos, loc = _pos(stop)
@@ -882,11 +875,11 @@ class SortedListWithKey(MutableSequence):
             return iter(())
         elif min_pos == max_pos and not reverse:
             return iter(_lists[min_pos][min_idx:max_idx])
-        elif min_pos == max_pos and reverse:
+        elif min_pos == max_pos:
             return reversed(_lists[min_pos][min_idx:max_idx])
         elif min_pos + 1 == max_pos and not reverse:
             return chain(_lists[min_pos][min_idx:], _lists[max_pos][:max_idx])
-        elif min_pos + 1 == max_pos and reverse:
+        elif min_pos + 1 == max_pos:
             return chain(
                 reversed(_lists[max_pos][:max_idx]),
                 reversed(_lists[min_pos][min_idx:]),
@@ -957,21 +950,20 @@ class SortedListWithKey(MutableSequence):
         if min_key is None:
             min_pos = 0
             min_idx = 0
+        elif inclusive[0]:
+            min_pos = bisect_left(_maxes, min_key)
+
+            if min_pos == len(_maxes):
+                return iter(())
+
+            min_idx = bisect_left(_keys[min_pos], min_key)
         else:
-            if inclusive[0]:
-                min_pos = bisect_left(_maxes, min_key)
+            min_pos = bisect_right(_maxes, min_key)
 
-                if min_pos == len(_maxes):
-                    return iter(())
+            if min_pos == len(_maxes):
+                return iter(())
 
-                min_idx = bisect_left(_keys[min_pos], min_key)
-            else:
-                min_pos = bisect_right(_maxes, min_key)
-
-                if min_pos == len(_maxes):
-                    return iter(())
-
-                min_idx = bisect_right(_keys[min_pos], min_key)
+            min_idx = bisect_right(_keys[min_pos], min_key)
 
         # Calculate the maximum (pos, idx) pair. By default this location
         # will be exclusive in our calculation.
@@ -979,23 +971,22 @@ class SortedListWithKey(MutableSequence):
         if max_key is None:
             max_pos = len(_maxes) - 1
             max_idx = len(_keys[max_pos])
-        else:
-            if inclusive[1]:
-                max_pos = bisect_right(_maxes, max_key)
+        elif inclusive[1]:
+            max_pos = bisect_right(_maxes, max_key)
 
-                if max_pos == len(_maxes):
-                    max_pos -= 1
-                    max_idx = len(_keys[max_pos])
-                else:
-                    max_idx = bisect_right(_keys[max_pos], max_key)
+            if max_pos == len(_maxes):
+                max_pos -= 1
+                max_idx = len(_keys[max_pos])
             else:
-                max_pos = bisect_left(_maxes, max_key)
+                max_idx = bisect_right(_keys[max_pos], max_key)
+        else:
+            max_pos = bisect_left(_maxes, max_key)
 
-                if max_pos == len(_maxes):
-                    max_pos -= 1
-                    max_idx = len(_keys[max_pos])
-                else:
-                    max_idx = bisect_left(_keys[max_pos], max_key)
+            if max_pos == len(_maxes):
+                max_pos -= 1
+                max_idx = len(_keys[max_pos])
+            else:
+                max_idx = bisect_left(_keys[max_pos], max_key)
 
         return self._islice(min_pos, min_idx, max_pos, max_idx, reverse)
 
@@ -1192,8 +1183,7 @@ class SortedListWithKey(MutableSequence):
 
         if idx < 0:
             idx += _len
-        if idx < 0:
-            idx = 0
+        idx = max(idx, 0)
         if idx > _len:
             idx = _len
 
@@ -1280,9 +1270,7 @@ class SortedListWithKey(MutableSequence):
             start = 0
         if start < 0:
             start += _len
-        if start < 0:
-            start = 0
-
+        start = max(start, 0)
         if stop is None:
             stop = _len
         if stop < 0:

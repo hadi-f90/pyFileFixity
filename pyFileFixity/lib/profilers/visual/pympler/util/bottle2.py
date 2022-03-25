@@ -280,7 +280,7 @@ class Router(object):
         self.routes = []     # List of all installed routes
         self.static = dict() # Cache for static routes
         self.dynamic = []    # Cache structure for dynamic routes
-        self.named = dict()  # Cache for named routes and their format strings
+        self.named = {}
 
     def add(self, *a, **ka):
         """ Adds a route->target pair or a Route object to the Router.
@@ -683,10 +683,12 @@ class Request(threading.local, DictMixin):
             Multiple values per key are possible. See MultiDict for details.
         """
         if self._POST is None:
-            save_env = dict() # Build a save environment for cgi
-            for key in ('REQUEST_METHOD', 'CONTENT_TYPE', 'CONTENT_LENGTH'):
-                if key in self.environ:
-                    save_env[key] = self.environ[key]
+            save_env = {
+                key: self.environ[key]
+                for key in ('REQUEST_METHOD', 'CONTENT_TYPE', 'CONTENT_LENGTH')
+                if key in self.environ
+            }
+
             save_env['QUERY_STRING'] = '' # Without this, sys.argv is called!
             if TextIOWrapper:
                 fb = TextIOWrapper(self.body, encoding='ISO-8859-1')
@@ -745,9 +747,7 @@ class Request(threading.local, DictMixin):
         """
         if self._COOKIES is None:
             raw_dict = SimpleCookie(self.environ.get('HTTP_COOKIE',''))
-            self._COOKIES = {}
-            for cookie in raw_dict.itervalues():
-                self._COOKIES[cookie.key] = cookie.value
+            self._COOKIES = {cookie.key: cookie.value for cookie in raw_dict.itervalues()}
         return self._COOKIES
 
     def get_cookie(self, *args):
@@ -843,7 +843,7 @@ class MultiDict(DictMixin):
     """ A dict that remembers old values for each key """
     # collections.MutableMapping would be better for Python >= 2.6
     def __init__(self, *a, **k):
-        self.dict = dict()
+        self.dict = {}
         for k, v in dict(*a, **k).iteritems():
             self[k] = v
 
@@ -932,7 +932,7 @@ def static_file(filename, root, guessmime=True, mimetype=None, download=False):
     """
     root = os.path.abspath(root) + os.sep
     filename = os.path.abspath(os.path.join(root, filename.strip('/\\')))
-    header = dict()
+    header = {}
 
     if not filename.startswith(root):
         return HTTPError(401, "Access denied.")
@@ -944,7 +944,7 @@ def static_file(filename, root, guessmime=True, mimetype=None, download=False):
     if not mimetype and guessmime:
         header['Content-Type'] = mimetypes.guess_type(filename)[0]
     else:
-        header['Content-Type'] = mimetype if mimetype else 'text/plain'
+        header['Content-Type'] = mimetype or 'text/plain'
 
     if download == True:
         download = os.path.basename(filename)

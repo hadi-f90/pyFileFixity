@@ -46,10 +46,7 @@ class _Node(object):
 
     def __str__(self):
         """Override str(self.o) if str_func is defined."""
-        if self.str_func is not None:
-            return self.str_func(self.o)
-        else:
-            return str(self.o)
+        return self.str_func(self.o) if self.str_func is not None else str(self.o)
 
 class RefBrowser(object):
     """Base class to other RefBrowser implementations.
@@ -76,12 +73,9 @@ class RefBrowser(object):
         self.str_func = str_func
         self.repeat = repeat
         self.stream = stream
-        # objects which should be ignored while building the tree
-        # e.g. the current frame
-        self.ignore = []
         # set of object ids which are already included
         self.already_included = set()
-        self.ignore.append(self.already_included)
+        self.ignore = [self.already_included]
 
     def get_tree(self):
         """Get a tree of referrers of the root object."""
@@ -160,10 +154,7 @@ class StreamBrowser(RefBrowser):
 
         """
         level = prefix.count(self.cross) + prefix.count(self.vline)
-        len_children = 0
-        if isinstance(tree , _Node):
-            len_children = len(tree.children)
-
+        len_children = len(tree.children) if isinstance(tree , _Node) else 0
         # add vertex
         prefix += str(tree)
         # and as many spaces as the vertex is long
@@ -308,10 +299,12 @@ try:
             are part of the profiler.
 
             """
-            new_children = []
-            for child in self.node.children:
-                if not isinstance(child, _TreeNode):
-                    new_children.append(child)
+            new_children = [
+                child
+                for child in self.node.children
+                if not isinstance(child, _TreeNode)
+            ]
+
             self.node.children = new_children
 
         def GetText(self):
@@ -332,11 +325,10 @@ try:
             """
             if not isinstance(self.node, _Node):
                 return False
+            if len(self.node.children) > 0:
+                return True
             else:
-                if len(self.node.children) > 0:
-                    return True
-                else:
-                    return muppy._is_containerobject(self.node.o)
+                return muppy._is_containerobject(self.node.o)
 
         def GetSubList(self):
             """This method is the point where further referrers are computed.
@@ -409,11 +401,9 @@ class InteractiveBrowser(RefBrowser):
 
 
 # list to hold to referrers
-superlist = []
 root = "root"
-for i in range(3):
-    tmp = [root]
-    superlist.append(tmp)
+tmp = [root]
+superlist = [tmp for _ in range(3)]
 
 def foo(o): return str(type(o))
 

@@ -89,44 +89,39 @@ def runprofile(mainfunction, output, timeout = 0, calibrate=False):
     return True
 
 def calibrateprofile():
-    '''
+	'''
     Calibrate the profiler (necessary to have non negative and more exact values)
     '''
-    pr = profile.Profile()
-    calib = []
-    crepeat = 10
-    for i in range(crepeat):
-            calib.append(pr.calibrate(10000))
-    final = sum(calib) / crepeat
-    profile.Profile.bias = final # Apply computed bias to all Profile instances created hereafter
-    return final
+	pr = profile.Profile()
+	crepeat = 10
+	calib = [pr.calibrate(10000) for _ in range(crepeat)]
+	final = sum(calib) / crepeat
+	profile.Profile.bias = final # Apply computed bias to all Profile instances created hereafter
+	return final
 
 def parseprofile(profilelog, out):
-    '''
+	'''
     Parse a profile log and print the result on screen
     '''
-    file = open(out, 'w') # opening the output file
-    print('Opening the profile in %s...' % profilelog)
-    p = pstats.Stats(profilelog, stream=file) # parsing the profile with pstats, and output everything to the file
+	with open(out, 'w') as file:
+		print('Opening the profile in %s...' % profilelog)
+		p = pstats.Stats(profilelog, stream=file) # parsing the profile with pstats, and output everything to the file
 
-    print('Generating the stats, please wait...')
-    file.write("=== All stats:\n")
-    p.strip_dirs().sort_stats(-1).print_stats()
-    file.write("=== Cumulative time:\n")
-    p.sort_stats('cumulative').print_stats(100)
-    file.write("=== Time:\n")
-    p.sort_stats('time').print_stats(100)
-    file.write("=== Time + cumulative time:\n")
-    p.sort_stats('time', 'cum').print_stats(.5, 'init')
-    file.write("=== Callees:\n")
-    p.print_callees()
-    file.write("=== Callers:\n")
-    p.print_callers()
-    #p.print_callers(.5, 'init')
-    #p.add('fooprof')
-    file.close()
-    print('Stats generated and saved to %s.' % out)
-    print('Everything is done. Exiting')
+		print('Generating the stats, please wait...')
+		file.write("=== All stats:\n")
+		p.strip_dirs().sort_stats(-1).print_stats()
+		file.write("=== Cumulative time:\n")
+		p.sort_stats('cumulative').print_stats(100)
+		file.write("=== Time:\n")
+		p.sort_stats('time').print_stats(100)
+		file.write("=== Time + cumulative time:\n")
+		p.sort_stats('time', 'cum').print_stats(.5, 'init')
+		file.write("=== Callees:\n")
+		p.print_callees()
+		file.write("=== Callers:\n")
+		p.print_callers()
+	print('Stats generated and saved to %s.' % out)
+	print('Everything is done. Exiting')
 
 def browseprofile(profilelog):
     '''

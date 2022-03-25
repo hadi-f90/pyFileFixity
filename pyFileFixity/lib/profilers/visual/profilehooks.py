@@ -337,10 +337,7 @@ class FuncProfile(object):
         print("")
         print("*** PROFILER RESULTS ***")
         print("%s (%s:%s)" % (funcname, filename, lineno))
-        if self.skipped:
-            skipped = "(%d calls not profiled)" % self.skipped
-        else:
-            skipped = ""
+        skipped = "(%d calls not profiled)" % self.skipped if self.skipped else ""
         print("function called %d times%s" % (self.ncalls, skipped))
         print("")
         stats = self.stats
@@ -440,10 +437,7 @@ if hotshot is not None:
             print("")
             print("*** PROFILER RESULTS ***")
             print("%s (%s:%s)" % (funcname, filename, lineno))
-            if self.skipped:
-                skipped = "(%d calls not profiled)" % self.skipped
-            else:
-                skipped = ""
+            skipped = "(%d calls not profiled)" % self.skipped if self.skipped else ""
             print("function called %d times%s" % (self.ncalls, skipped))
             print("")
             stats = hotshot.stats.load(self.logfilename)
@@ -626,9 +620,8 @@ class FuncSource:
         lineno = self.firstlineno
         counter = 0
         for line in self.source:
-            if self.sourcelines.get(lineno) == 0:
-                if not self.blank_rx.match(line):
-                    counter += 1
+            if self.sourcelines.get(lineno) == 0 and not self.blank_rx.match(line):
+                counter += 1
             lineno += 1
         return counter
 
@@ -641,10 +634,7 @@ class FuncSource:
             if counter is None:
                 prefix = ' ' * 7
             elif counter == 0:
-                if self.blank_rx.match(line):
-                    prefix = ' ' * 7
-                else:
-                    prefix = '>' * 6 + ' '
+                prefix = ' ' * 7 if self.blank_rx.match(line) else '>' * 6 + ' '
             else:
                 prefix = '%5d: ' % counter
             lines.append(prefix + line)

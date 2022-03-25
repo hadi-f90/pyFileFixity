@@ -107,5 +107,4 @@ class ConfigPanel(ScrolledPanel, OptionReader):
     args = [iter(iterable)] * n
     return izip_longest(fillvalue=fillvalue, *args)
 
-if __name__ == '__main__':
-  pass
+pass

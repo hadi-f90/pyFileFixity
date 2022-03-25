@@ -55,14 +55,11 @@ def decode(input_filename):
     sys.stderr.write("\n")
 
 if __name__ == "__main__":
-
-    if "-d" == sys.argv[1]:
+    if sys.argv[1] == "-d":
         # decode
         decode(sys.argv[2])
 
+    elif len(sys.argv) >= 2:
+        encode(open(sys.argv[1], 'rb'), sys.argv[2])
     else:
-        # encode
-        if len(sys.argv) >= 2:
-            encode(open(sys.argv[1], 'rb'), sys.argv[2])
-        else:
-            encode(sys.stdin, sys.argv[1])
+        encode(sys.stdin, sys.argv[1])
